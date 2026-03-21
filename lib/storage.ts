@@ -16,7 +16,11 @@ export function loadNotes(): Note[] {
 
   try {
     const parsed = JSON.parse(saved) as Note[];
-    return parsed.length > 0 ? parsed : sampleNotes;
+    const normalized = parsed.map((note) => ({
+      ...note,
+      updatedAt: note.updatedAt ?? note.createdAt,
+    }));
+    return normalized.length > 0 ? normalized : sampleNotes;
   } catch {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
     return sampleNotes;

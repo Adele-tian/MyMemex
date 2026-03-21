@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ArrowDownAZ, ArrowUpAZ, Clock3, History, SquarePen } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { InspirationInput } from "@/components/inspiration-input";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -13,6 +14,9 @@ import { loadNotes, saveNotes } from "@/lib/storage";
 import { Note, ViewFilter } from "@/lib/types";
 import { extractTags, extractTitle } from "@/lib/utils";
 
+type SortField = "updatedAt" | "createdAt";
+type SortDirection = "desc" | "asc";
+
 function AppContent() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -20,6 +24,10 @@ function AppContent() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [showCapture, setShowCapture] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("updatedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     setNotes(loadNotes());
@@ -33,33 +41,45 @@ function AppContent() {
   }, [hydrated, notes]);
 
   const tags = useMemo(
-    () =>
-      Array.from(new Set(notes.flatMap((note) => note.tags)))
-        .sort((a, b) => a.localeCompare(b)),
+    () => Array.from(new Set(notes.flatMap((note) => note.tags))).sort((a, b) => a.localeCompare(b)),
     [notes],
   );
 
   const filteredNotes = useMemo(() => {
-    const sorted = [...notes].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    const scoped = [...notes]
+      .filter((note) => {
+        if (filter === "all") {
+          return true;
+        }
 
-    if (filter === "all") {
-      return sorted;
-    }
+        if (filter === "recent") {
+          const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          return new Date(note.updatedAt).getTime() >= sevenDaysAgo;
+        }
 
-    if (filter === "recent") {
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      return sorted.filter((note) => new Date(note.createdAt).getTime() >= sevenDaysAgo);
-    }
+        if (filter.startsWith("tag:")) {
+          const tag = filter.replace("tag:", "");
+          return note.tags.includes(tag);
+        }
 
-    if (filter.startsWith("tag:")) {
-      const tag = filter.replace("tag:", "");
-      return sorted.filter((note) => note.tags.includes(tag));
-    }
+        return true;
+      })
+      .filter((note) => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) {
+          return true;
+        }
 
-    return sorted;
-  }, [filter, notes]);
+        const haystack = [note.title, note.content, note.tags.join(" ")].join(" ").toLowerCase();
+        return haystack.includes(query);
+      });
+
+    return scoped.sort((a, b) => {
+      const left = new Date(a[sortField]).getTime();
+      const right = new Date(b[sortField]).getTime();
+      return sortDirection === "desc" ? right - left : left - right;
+    });
+  }, [filter, notes, searchQuery, sortDirection, sortField]);
 
   const handleCreateNote = (content: string) => {
     const now = new Date().toISOString();
@@ -69,13 +89,16 @@ function AppContent() {
       content,
       tags: extractTags(content),
       createdAt: now,
+      updatedAt: now,
     };
 
     setNotes((current) => [newNote, ...current]);
     setFilter("all");
+    setShowCapture(true);
   };
 
   const handleSaveEdit = (noteId: string, content: string) => {
+    const now = new Date().toISOString();
     setNotes((current) =>
       current.map((note) =>
         note.id === noteId
@@ -84,6 +107,7 @@ function AppContent() {
               title: extractTitle(content),
               content,
               tags: extractTags(content),
+              updatedAt: now,
             }
           : note,
       ),
@@ -102,6 +126,13 @@ function AppContent() {
     }
   };
 
+  const handleSelectFilter = (nextFilter: ViewFilter) => {
+    setFilter(nextFilter);
+    setShowCapture(false);
+  };
+
+  const showSortControls = !showCapture || searchQuery.trim().length > 0;
+
   return (
     <div className="min-h-screen bg-paper">
       <NoteEditorModal
@@ -115,9 +146,11 @@ function AppContent() {
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         currentFilter={filter}
-        onSelectFilter={setFilter}
+        onSelectFilter={handleSelectFilter}
         tags={tags}
         notesCount={notes.length}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       <div className="mx-auto flex min-h-screen max-w-[1800px]">
@@ -125,16 +158,18 @@ function AppContent() {
           collapsed={collapsed}
           currentFilter={filter}
           onToggle={() => setCollapsed((value) => !value)}
-          onSelectFilter={setFilter}
+          onSelectFilter={handleSelectFilter}
           tags={tags}
           notesCount={notes.length}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
 
         <main className="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           <TopBar onOpenMenu={() => setMobileOpen(true)} noteCount={notes.length} />
 
           <div className="mt-6 space-y-6">
-            <InspirationInput onSubmit={handleCreateNote} />
+            {showCapture && <InspirationInput onSubmit={handleCreateNote} />}
 
             <section>
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -146,9 +181,69 @@ function AppContent() {
                     {filter.startsWith("tag:") && `#${filter.replace("tag:", "")}`}
                   </h3>
                 </div>
-                <p className="text-sm text-foreground/55">
-                  用轻量卡片整理碎片灵感，让知识自然沉淀并随时回看。
-                </p>
+                {showSortControls ? (
+                  <div className="flex flex-col gap-3 sm:items-end">
+                    <div className="flex flex-wrap gap-2">
+                      {!showCapture && (
+                        <button
+                          type="button"
+                          onClick={() => setShowCapture(true)}
+                          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
+                        >
+                          <SquarePen className="h-4 w-4" />
+                          打开灵感框
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSortField("updatedAt")}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                          sortField === "updatedAt"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                        }`}
+                      >
+                        <History className="h-4 w-4" />
+                        按修改时间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortField("createdAt")}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                          sortField === "createdAt"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                        }`}
+                      >
+                        <Clock3 className="h-4 w-4" />
+                        按创建时间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
+                      >
+                        {sortDirection === "desc" ? (
+                          <ArrowDownAZ className="h-4 w-4" />
+                        ) : (
+                          <ArrowUpAZ className="h-4 w-4" />
+                        )}
+                        {sortDirection === "desc" ? "从近到远" : "从远到近"}
+                      </button>
+                    </div>
+                    <p className="text-sm text-foreground/55">
+                      {searchQuery.trim()
+                        ? `当前搜索：${searchQuery}`
+                        : "浏览历史笔记，并按创建或修改时间切换排序。"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground/55">
+                    用轻量卡片整理碎片灵感，让知识自然沉淀并随时回看。
+                  </p>
+                )}
               </div>
 
               {filteredNotes.length > 0 ? (

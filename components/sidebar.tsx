@@ -11,6 +11,8 @@ interface SidebarProps {
   tags: string[];
   notesCount: number;
   mobileVisible?: boolean;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
 }
 
 export function Sidebar({
@@ -21,28 +23,42 @@ export function Sidebar({
   tags,
   notesCount,
   mobileVisible = false,
+  searchQuery,
+  onSearchChange,
 }: SidebarProps) {
   return (
     <aside
       className={`border-r border-border/70 bg-card/70 backdrop-blur-xl ${
         mobileVisible ? "flex w-full" : "hidden lg:flex"
-      } ${
-        collapsed ? "w-24" : "w-80"
-      } flex-col transition-all duration-300`}
+      } ${collapsed ? "w-24" : "w-80"} flex-col transition-all duration-300`}
     >
-      <div className="flex items-center justify-between border-b border-border/70 px-4 py-5">
-        <div className={`${collapsed ? "hidden" : "block"}`}>
-          <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Second Brain</p>
-          <h1 className="mt-2 text-xl font-semibold text-foreground">Knowledge Atlas</h1>
+      <div className="border-b border-border/70 px-4 py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className={collapsed ? "hidden" : "block flex-1"}>
+            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Second Brain</p>
+            <h1 className="mt-2 text-xl font-semibold text-foreground">Knowledge Atlas</h1>
+          </div>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="rounded-2xl border border-border/70 bg-background/80 p-2 text-foreground/70 transition hover:border-primary/30 hover:text-primary"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="rounded-2xl border border-border/70 bg-background/80 p-2 text-foreground/70 transition hover:border-primary/30 hover:text-primary"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </button>
+
+        {!collapsed && (
+          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 px-3 py-3 text-foreground/55 focus-within:border-primary/30 focus-within:text-primary">
+            <Search className="h-4 w-4 shrink-0" />
+            <input
+              value={searchQuery}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="搜索标题、内容或标签"
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/35"
+            />
+          </label>
+        )}
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-4">
