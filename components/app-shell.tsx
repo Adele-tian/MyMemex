@@ -10,12 +10,46 @@ import { NoteEditorModal } from "@/components/note-editor-modal";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
+import { sampleNotes } from "@/lib/sample-notes";
 import { loadNotes, saveNotes } from "@/lib/storage";
 import { Note, ViewFilter } from "@/lib/types";
 import { extractTags, extractTitle } from "@/lib/utils";
 
 type SortField = "updatedAt" | "createdAt";
 type SortDirection = "desc" | "asc";
+
+function getDailyReviewNotes(notes: Note[]) {
+  const now = new Date();
+  const daySeed = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+  const candidates = notes.filter((note) => {
+    const ageMs = now.getTime() - new Date(note.createdAt).getTime();
+    return ageMs >= 24 * 60 * 60 * 1000;
+  });
+
+  const source = candidates.length >= 3 ? candidates : notes;
+
+  return [...source]
+    .map((note) => {
+      const createdAgeDays = Math.max(
+        1,
+        Math.floor((now.getTime() - new Date(note.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
+      );
+      const updatedAgeDays = Math.max(
+        1,
+        Math.floor((now.getTime() - new Date(note.updatedAt).getTime()) / (24 * 60 * 60 * 1000)),
+      );
+      const jitter = [...`${daySeed}-${note.id}`].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 7;
+
+      return {
+        note,
+        score: createdAgeDays * 0.65 + updatedAgeDays * 0.35 + jitter * 0.1,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((item) => item.note);
+}
 
 function AppContent() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -40,21 +74,30 @@ function AppContent() {
     }
   }, [hydrated, notes]);
 
+  useEffect(() => {
+    if (hydrated && notes.length === 0) {
+      setNotes(sampleNotes);
+    }
+  }, [hydrated, notes]);
+
   const tags = useMemo(
     () => Array.from(new Set(notes.flatMap((note) => note.tags))).sort((a, b) => a.localeCompare(b)),
     [notes],
   );
 
+  const dailyReviewNotes = useMemo(() => getDailyReviewNotes(notes), [notes]);
+
   const filteredNotes = useMemo(() => {
-    const scoped = [...notes]
+    const baseNotes = filter === "review" ? dailyReviewNotes : notes;
+
+    const scoped = [...baseNotes]
       .filter((note) => {
         if (filter === "all") {
           return true;
         }
 
-        if (filter === "recent") {
-          const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          return new Date(note.updatedAt).getTime() >= sevenDaysAgo;
+        if (filter === "review") {
+          return true;
         }
 
         if (filter.startsWith("tag:")) {
@@ -79,7 +122,7 @@ function AppContent() {
       const right = new Date(b[sortField]).getTime();
       return sortDirection === "desc" ? right - left : left - right;
     });
-  }, [filter, notes, searchQuery, sortDirection, sortField]);
+  }, [dailyReviewNotes, filter, notes, searchQuery, sortDirection, sortField]);
 
   const handleCreateNote = (content: string) => {
     const now = new Date().toISOString();
@@ -132,6 +175,7 @@ function AppContent() {
   };
 
   const showSortControls = !showCapture || searchQuery.trim().length > 0;
+  const allowSorting = filter !== "review";
 
   return (
     <div className="min-h-screen bg-paper">
@@ -178,7 +222,7 @@ function AppContent() {
                   <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Knowledge Stream</p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
                     {filter === "all" && "全部卡片"}
-                    {filter === "recent" && "最近更新"}
+                    {filter === "review" && "今日回顾"}
                     {filter.startsWith("tag:") && `#${filter.replace("tag:", "")}`}
                   </h3>
                 </div>
@@ -195,48 +239,54 @@ function AppContent() {
                           打开灵感框
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setSortField("updatedAt")}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                          sortField === "updatedAt"
-                            ? "border-primary/30 bg-primary/10 text-primary"
-                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                        }`}
-                      >
-                        <History className="h-4 w-4" />
-                        按修改时间
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSortField("createdAt")}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                          sortField === "createdAt"
-                            ? "border-primary/30 bg-primary/10 text-primary"
-                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                        }`}
-                      >
-                        <Clock3 className="h-4 w-4" />
-                        按创建时间
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
-                        }
-                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
-                      >
-                        {sortDirection === "desc" ? (
-                          <ArrowDownAZ className="h-4 w-4" />
-                        ) : (
-                          <ArrowUpAZ className="h-4 w-4" />
-                        )}
-                        {sortDirection === "desc" ? "从近到远" : "从远到近"}
-                      </button>
+                      {allowSorting && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setSortField("updatedAt")}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                              sortField === "updatedAt"
+                                ? "border-primary/30 bg-primary/10 text-primary"
+                                : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                            }`}
+                          >
+                            <History className="h-4 w-4" />
+                            按修改时间
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSortField("createdAt")}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                              sortField === "createdAt"
+                                ? "border-primary/30 bg-primary/10 text-primary"
+                                : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                            }`}
+                          >
+                            <Clock3 className="h-4 w-4" />
+                            按创建时间
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+                            }
+                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
+                          >
+                            {sortDirection === "desc" ? (
+                              <ArrowDownAZ className="h-4 w-4" />
+                            ) : (
+                              <ArrowUpAZ className="h-4 w-4" />
+                            )}
+                            {sortDirection === "desc" ? "从近到远" : "从远到近"}
+                          </button>
+                        </>
+                      )}
                     </div>
                     <p className="text-sm text-foreground/55">
                       {searchQuery.trim()
                         ? `当前搜索：${searchQuery}`
+                        : filter === "review"
+                          ? "基于旧笔记年龄与最近编辑时间，自动挑选 3 条值得今天回顾的内容。"
                         : "浏览历史笔记，并按创建或修改时间切换排序。"}
                     </p>
                   </div>

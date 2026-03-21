@@ -1,4 +1,4 @@
-export type ViewFilter = "all" | "recent" | `tag:${string}`;
+export type ViewFilter = "all" | "review" | `tag:${string}`;
 
 export interface Note {
   id: string;

@@ -20,7 +20,12 @@ export function loadNotes(): Note[] {
       ...note,
       updatedAt: note.updatedAt ?? note.createdAt,
     }));
-    return normalized.length > 0 ? normalized : sampleNotes;
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
+    return sampleNotes;
   } catch {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
     return sampleNotes;
