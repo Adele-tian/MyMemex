@@ -1,6 +1,6 @@
 "use client";
 
-import { BookText, Hash, History, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { BookText, Hash, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { ViewFilter } from "@/lib/types";
 
 interface SidebarProps {
@@ -54,14 +54,6 @@ export function Sidebar({
             label="所有笔记"
             meta={`${notesCount} 条`}
             onClick={() => onSelectFilter("all")}
-          />
-          <NavButton
-            collapsed={collapsed}
-            active={currentFilter === "review"}
-            icon={<History className="h-4 w-4" />}
-            label="今日回顾"
-            meta="3 条"
-            onClick={() => onSelectFilter("review")}
           />
         </div>
 

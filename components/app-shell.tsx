@@ -88,15 +88,9 @@ function AppContent() {
   const dailyReviewNotes = useMemo(() => getDailyReviewNotes(notes), [notes]);
 
   const filteredNotes = useMemo(() => {
-    const baseNotes = filter === "review" ? dailyReviewNotes : notes;
-
-    const scoped = [...baseNotes]
+    const scoped = [...notes]
       .filter((note) => {
         if (filter === "all") {
-          return true;
-        }
-
-        if (filter === "review") {
           return true;
         }
 
@@ -122,7 +116,7 @@ function AppContent() {
       const right = new Date(b[sortField]).getTime();
       return sortDirection === "desc" ? right - left : left - right;
     });
-  }, [dailyReviewNotes, filter, notes, searchQuery, sortDirection, sortField]);
+  }, [filter, notes, searchQuery, sortDirection, sortField]);
 
   const handleCreateNote = (content: string) => {
     const now = new Date().toISOString();
@@ -175,7 +169,7 @@ function AppContent() {
   };
 
   const showSortControls = !showCapture || searchQuery.trim().length > 0;
-  const allowSorting = filter !== "review";
+  const showDailyReview = showCapture && filter === "all" && searchQuery.trim().length === 0;
 
   return (
     <div className="min-h-screen bg-paper">
@@ -216,13 +210,37 @@ function AppContent() {
           <div className="mt-6 space-y-6">
             {showCapture && <InspirationInput onSubmit={handleCreateNote} />}
 
+            {showDailyReview && dailyReviewNotes.length > 0 && (
+              <section>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Today Review</p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">今日回顾</h3>
+                  </div>
+                  <p className="text-sm text-foreground/55">
+                    从旧笔记里自动挑选 3 条内容，帮助你在首页快速回顾重点。
+                  </p>
+                </div>
+
+                <div className="columns-1 gap-4 space-y-4 md:columns-2 xl:columns-3">
+                  {dailyReviewNotes.map((note) => (
+                    <NoteCard
+                      key={`review-${note.id}`}
+                      note={note}
+                      onEdit={setEditingNote}
+                      onDelete={handleDeleteNote}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section>
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Knowledge Stream</p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
                     {filter === "all" && "全部卡片"}
-                    {filter === "review" && "今日回顾"}
                     {filter.startsWith("tag:") && `#${filter.replace("tag:", "")}`}
                   </h3>
                 </div>
@@ -239,54 +257,48 @@ function AppContent() {
                           打开灵感框
                         </button>
                       )}
-                      {allowSorting && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setSortField("updatedAt")}
-                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                              sortField === "updatedAt"
-                                ? "border-primary/30 bg-primary/10 text-primary"
-                                : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                            }`}
-                          >
-                            <History className="h-4 w-4" />
-                            按修改时间
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSortField("createdAt")}
-                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                              sortField === "createdAt"
-                                ? "border-primary/30 bg-primary/10 text-primary"
-                                : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                            }`}
-                          >
-                            <Clock3 className="h-4 w-4" />
-                            按创建时间
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
-                            }
-                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
-                          >
-                            {sortDirection === "desc" ? (
-                              <ArrowDownAZ className="h-4 w-4" />
-                            ) : (
-                              <ArrowUpAZ className="h-4 w-4" />
-                            )}
-                            {sortDirection === "desc" ? "从近到远" : "从远到近"}
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSortField("updatedAt")}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                          sortField === "updatedAt"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                        }`}
+                      >
+                        <History className="h-4 w-4" />
+                        按修改时间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortField("createdAt")}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                          sortField === "createdAt"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
+                        }`}
+                      >
+                        <Clock3 className="h-4 w-4" />
+                        按创建时间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
+                      >
+                        {sortDirection === "desc" ? (
+                          <ArrowDownAZ className="h-4 w-4" />
+                        ) : (
+                          <ArrowUpAZ className="h-4 w-4" />
+                        )}
+                        {sortDirection === "desc" ? "从近到远" : "从远到近"}
+                      </button>
                     </div>
                     <p className="text-sm text-foreground/55">
                       {searchQuery.trim()
                         ? `当前搜索：${searchQuery}`
-                        : filter === "review"
-                          ? "基于旧笔记年龄与最近编辑时间，自动挑选 3 条值得今天回顾的内容。"
                         : "浏览历史笔记，并按创建或修改时间切换排序。"}
                     </p>
                   </div>
