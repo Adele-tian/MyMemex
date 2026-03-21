@@ -11,8 +11,6 @@ interface SidebarProps {
   tags: string[];
   notesCount: number;
   mobileVisible?: boolean;
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function Sidebar({
@@ -23,8 +21,6 @@ export function Sidebar({
   tags,
   notesCount,
   mobileVisible = false,
-  searchQuery,
-  onSearchChange,
 }: SidebarProps) {
   return (
     <aside
@@ -47,18 +43,6 @@ export function Sidebar({
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
         </div>
-
-        {!collapsed && (
-          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 px-3 py-3 text-foreground/55 focus-within:border-primary/30 focus-within:text-primary">
-            <Search className="h-4 w-4 shrink-0" />
-            <input
-              value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="搜索标题、内容或标签"
-              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/35"
-            />
-          </label>
-        )}
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-4">

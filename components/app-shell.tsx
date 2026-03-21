@@ -149,8 +149,6 @@ function AppContent() {
         onSelectFilter={handleSelectFilter}
         tags={tags}
         notesCount={notes.length}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
       />
 
       <div className="mx-auto flex min-h-screen max-w-[1800px]">
@@ -161,12 +159,15 @@ function AppContent() {
           onSelectFilter={handleSelectFilter}
           tags={tags}
           notesCount={notes.length}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
         />
 
         <main className="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-          <TopBar onOpenMenu={() => setMobileOpen(true)} noteCount={notes.length} />
+          <TopBar
+            onOpenMenu={() => setMobileOpen(true)}
+            noteCount={notes.length}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
 
           <div className="mt-6 space-y-6">
             {showCapture && <InspirationInput onSubmit={handleCreateNote} />}

@@ -11,8 +11,6 @@ interface MobileSidebarProps {
   onSelectFilter: (filter: ViewFilter) => void;
   tags: string[];
   notesCount: number;
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function MobileSidebar(props: MobileSidebarProps) {
@@ -45,8 +43,6 @@ export function MobileSidebar(props: MobileSidebarProps) {
             tags={props.tags}
             notesCount={props.notesCount}
             mobileVisible
-            searchQuery={props.searchQuery}
-            onSearchChange={props.onSearchChange}
           />
         </div>
       </div>
