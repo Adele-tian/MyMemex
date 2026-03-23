@@ -1,6 +1,6 @@
 "use client";
 
-import { BookText, Hash, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { BookText, Hash, PanelLeftClose, PanelLeftOpen, Search, Settings, BarChart3 } from "lucide-react";
 import { ViewFilter } from "@/lib/types";
 
 interface SidebarProps {
@@ -22,6 +22,8 @@ export function Sidebar({
   notesCount,
   mobileVisible = false,
 }: SidebarProps) {
+  const isVisualizationActive = typeof currentFilter === 'string' && currentFilter === 'visualization';
+
   return (
     <aside
       className={`border-r border-border/70 bg-card/70 backdrop-blur-xl ${
@@ -54,6 +56,24 @@ export function Sidebar({
             label="所有笔记"
             meta={`${notesCount} 条`}
             onClick={() => onSelectFilter("all")}
+          />
+
+          <NavButton
+            collapsed={collapsed}
+            active={isVisualizationActive}
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="数据可视化"
+            meta=""
+            onClick={() => onSelectFilter("visualization")}
+          />
+
+          <NavButton
+            collapsed={collapsed}
+            active={currentFilter === "settings"}
+            icon={<Settings className="h-4 w-4" />}
+            label="设置"
+            meta=""
+            onClick={() => onSelectFilter("settings")}
           />
         </div>
 

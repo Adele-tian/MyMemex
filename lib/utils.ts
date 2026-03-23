@@ -40,3 +40,92 @@ export function extractTags(input: string) {
   const matches = input.match(/#([\p{L}\p{N}_-]+)/gu) ?? [];
   return Array.from(new Set(matches.map((match) => match.replace(/^#/, ""))));
 }
+
+/**
+ * Suggest tags based on content analysis
+ */
+export function suggestTags(content: string, existingTags: string[] = [], allKnownTags: string[] = []): string[] {
+  const suggestions: string[] = [];
+
+  // Extract words from content (excluding common stop words)
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'the', 'this', 'that',
+    'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'its', 'our', 'their', 'which', 'who', 'what', 'where', 'when', 'why', 'how',
+    'as', 'if', 'so', 'than', 'too', 'very', 'just', 'now', 'then', 'there', 'here', 'also', 'too',
+    '很', '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也',
+    '很', '或', '与', '及', '及', '等', '为', '以', '于', '中', '出', '而', '你', '他', '她', '它',
+    '我们', '你们', '他们', '她们', '它们', '这', '那', '哪', '什么', '怎么', '为什么', '哪里', '何时'
+  ]);
+
+  const words = content
+    .toLowerCase()
+    .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ') // Replace punctuation with spaces
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.has(word)); // Filter short words and stop words
+
+  // Count word frequencies
+  const wordFreq: Record<string, number> = {};
+  words.forEach(word => {
+    wordFreq[word] = (wordFreq[word] || 0) + 1;
+  });
+
+  // Get top frequent words that aren't already tags
+  const topWords = Object.entries(wordFreq)
+    .filter(([word]) => !existingTags.includes(word))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5) // Top 5 suggestions
+    .map(([word]) => word);
+
+  suggestions.push(...topWords);
+
+  // Also suggest from known tags that appear frequently in the content
+  const knownTagSuggestions = allKnownTags.filter(tag =>
+    content.toLowerCase().includes(tag.toLowerCase()) &&
+    !existingTags.includes(tag)
+  );
+
+  suggestions.push(...knownTagSuggestions.slice(0, 3)); // Add up to 3 known tags
+
+  // Return unique suggestions
+  return [...new Set(suggestions)];
+}
+
+/**
+ * Create hierarchical tags from flat tags
+ * Example: ['project:web', 'priority:high'] -> { project: ['web'], priority: ['high'] }
+ */
+export function createHierarchicalTags(tags: string[]): Record<string, string[]> {
+  const hierarchy: Record<string, string[]> = {};
+
+  tags.forEach(tag => {
+    if (tag.includes(':')) {
+      const [category, subtag] = tag.split(':');
+      if (!hierarchy[category]) {
+        hierarchy[category] = [];
+      }
+      if (!hierarchy[category].includes(subtag)) {
+        hierarchy[category].push(subtag);
+      }
+    }
+  });
+
+  return hierarchy;
+}
+
+/**
+ * Flatten hierarchical tags back to flat array
+ */
+export function flattenHierarchicalTags(hierarchy: Record<string, string[]>): string[] {
+  const tags: string[] = [];
+
+  Object.entries(hierarchy).forEach(([category, subtags]) => {
+    subtags.forEach(subtag => {
+      tags.push(`${category}:${subtag}`);
+    });
+  });
+
+  return tags;
+}

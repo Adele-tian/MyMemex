@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, MoonStar, Search, SunMedium } from "lucide-react";
+import { Menu, MoonStar, Search, SunMedium, X } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
 interface TopBarProps {
@@ -8,9 +8,10 @@ interface TopBarProps {
   noteCount: number;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  onClearSearch?: () => void;
 }
 
-export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange }: TopBarProps) {
+export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange, onClearSearch }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -46,15 +47,26 @@ export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange }: T
         </div>
       </div>
 
-      <label className="mt-4 flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/80 px-4 py-3 text-foreground/55 focus-within:border-primary/30 focus-within:text-primary">
-        <Search className="h-4 w-4 shrink-0" />
-        <input
-          value={searchQuery}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="搜索标题、内容或标签"
-          className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/35"
-        />
-      </label>
+      <div className="mt-4 flex items-center gap-2">
+        <label className="flex-1 flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/80 px-4 py-3 text-foreground/55 focus-within:border-primary/30 focus-within:text-primary">
+          <Search className="h-4 w-4 shrink-0" />
+          <input
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="搜索标题、内容或标签 (支持高级语法: tag:tagName, 'exact phrase')"
+            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/35"
+          />
+        </label>
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={onClearSearch || (() => onSearchChange(""))}
+            className="inline-flex items-center gap-2 rounded-2xl border border-border/70 bg-background/80 p-2.5 text-sm text-foreground/70 transition hover:border-primary/20 hover:text-primary"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

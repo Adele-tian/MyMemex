@@ -1,4 +1,11 @@
-export type ViewFilter = "all" | `tag:${string}`;
+export type ViewFilter = "all" | "settings" | "visualization" | `tag:${string}`;
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  createdAt: string;
+}
 
 export interface Note {
   id: string;

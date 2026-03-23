@@ -1,6 +1,7 @@
 import { Clock3, FilePenLine, Hash, Trash2 } from "lucide-react";
 import { Note } from "@/lib/types";
 import { formatDate, summarize } from "@/lib/utils";
+import { RichContentViewer } from "@/components/rich-content-viewer";
 
 interface NoteCardProps {
   note: Note;
@@ -38,7 +39,9 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         </div>
       </div>
 
-      <p className="mt-4 text-sm leading-7 text-foreground/70">{summarize(note.content, 180)}</p>
+      <div className="mt-4 text-sm leading-7 text-foreground/70">
+        <RichContentViewer content={summarize(note.content, 180)} />
+      </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {note.tags.map((tag) => (

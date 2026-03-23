@@ -1,0 +1,186 @@
+import { useState } from "react";
+import { Download, Upload, FileText, DatabaseBackup, Settings } from "lucide-react";
+import { exportNotesToJson, importNotesFromJson, exportNotesToMarkdown, downloadFile, readFile } from "@/lib/export-import-utils";
+import { Note } from "@/lib/types";
+
+interface SettingsPanelProps {
+  notes: Note[];
+  onImportSuccess: (importedNotes: Note[]) => void;
+}
+
+export function SettingsPanel({ notes, onImportSuccess }: SettingsPanelProps) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>("backup");
+
+  const toggleSection = (section: string) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const handleJsonExport = () => {
+    setIsExporting(true);
+    try {
+      const jsonContent = exportNotesToJson(notes);
+      downloadFile(jsonContent, `mymemex-backup-${new Date().toISOString().split('T')[0]}.json`, "application/json");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleMarkdownExport = () => {
+    setIsExporting(true);
+    try {
+      const markdownFiles = exportNotesToMarkdown(notes);
+
+      // Create a single consolidated markdown file
+      let consolidatedContent = "# MyMemex Notes Export\n\n";
+      consolidatedContent += `Exported on: ${new Date().toISOString()}\n\n`;
+
+      notes.forEach((note, index) => {
+        consolidatedContent += `## ${index + 1}. ${note.title}\n\n`;
+        consolidatedContent += `${note.content}\n\n`;
+        consolidatedContent += `*Created: ${note.createdAt} | Updated: ${note.updatedAt} | Tags: ${note.tags.join(', ')}*\n\n---\n\n`;
+      });
+
+      downloadFile(consolidatedContent, `mymemex-notes-${new Date().toISOString().split('T')[0]}.md`, "text/markdown");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportError(null);
+
+    try {
+      const content = await readFile(file);
+
+      // Try to parse as JSON first
+      let importedNotes: Note[] = [];
+      try {
+        importedNotes = importNotesFromJson(content);
+      } catch (jsonError) {
+        // If JSON parsing fails, we could potentially support other formats in the future
+        throw new Error("Unsupported file format. Please upload a valid JSON backup.");
+      }
+
+      if (importedNotes.length === 0) {
+        throw new Error("No valid notes found in the imported file.");
+      }
+
+      // Confirm with user before importing
+      const confirmed = window.confirm(
+        `Import ${importedNotes.length} notes? This will add them to your existing notes.`
+      );
+
+      if (confirmed) {
+        onImportSuccess(importedNotes);
+      }
+    } catch (error: any) {
+      console.error("Import error:", error);
+      setImportError(error.message || "Failed to import notes. Please check the file format.");
+    } finally {
+      setIsImporting(false);
+      // Reset the file input
+      event.target.value = "";
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-card/70 p-5">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <Settings className="h-5 w-5" />
+        设置
+      </h3>
+
+      <div className="space-y-4">
+        {/* Backup & Import Section */}
+        <div>
+          <button
+            type="button"
+            onClick={() => toggleSection("backup")}
+            className="flex items-center justify-between w-full text-left font-medium text-foreground mb-2 p-2 rounded-lg hover:bg-accent/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <DatabaseBackup className="h-4 w-4" />
+              数据备份与导入
+            </div>
+            <svg
+              className={`h-4 w-4 transform transition-transform ${expandedSection === "backup" ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {expandedSection === "backup" && (
+            <div className="space-y-4 ml-2 pl-4 border-l border-border/50 pt-2">
+              <div>
+                <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  导出数据
+                </h4>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleJsonExport}
+                    disabled={isExporting || notes.length === 0}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 py-2 text-sm text-foreground/70 transition hover:text-foreground disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isExporting ? "导出中..." : "JSON格式备份"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleMarkdownExport}
+                    disabled={isExporting || notes.length === 0}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 py-2 text-sm text-foreground/70 transition hover:text-foreground disabled:opacity-50"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {isExporting ? "导出中..." : "Markdown格式"}
+                  </button>
+                </div>
+                {notes.length === 0 && (
+                  <p className="text-sm text-foreground/50 mt-2">暂无笔记可导出</p>
+                )}
+              </div>
+
+              <div>
+                <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  导入数据
+                </h4>
+                <div className="flex flex-col gap-2">
+                  <label className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 py-2 text-sm text-foreground/70 transition hover:text-foreground cursor-pointer">
+                    <Upload className="h-4 w-4" />
+                    {isImporting ? "导入中..." : "选择备份文件"}
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileImport}
+                      className="hidden"
+                      disabled={isImporting}
+                    />
+                  </label>
+                  <p className="text-xs text-foreground/50">
+                    支持导入JSON格式的MyMemex备份文件
+                  </p>
+                  {importError && (
+                    <p className="text-sm text-destructive mt-2">{importError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
