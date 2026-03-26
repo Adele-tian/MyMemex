@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bold, Italic, Underline, List, ListOrdered, Quote, Code, Image, Link } from "lucide-react";
+import { Bold, Italic, Underline, List, ListOrdered, Quote, Code, Image as ImageIcon, Link } from "lucide-react";
 
 interface RichTextEditorProps {
   content: string;
@@ -134,7 +134,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
           className="p-2 rounded-md hover:bg-accent"
           title="Insert Image"
         >
-          <Image className="h-4 w-4" />
+          <ImageIcon className="h-4 w-4" />
         </button>
         <button
           type="button"

@@ -1,44 +1,33 @@
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
-
 interface RichContentViewerProps {
   content: string;
 }
 
-export function RichContentViewer({ content }: RichContentViewerProps) {
-  // If the content looks like HTML, sanitize and render it
-  // Otherwise, render as markdown-compatible text
-  const isHTML = /<\/?[a-z][\s\S]*>/i.test(content);
+function stripHtml(input: string) {
+  return input
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+}
 
-  if (isHTML) {
-    // Sanitize HTML to prevent XSS
-    const sanitizedHTML = DOMPurify.sanitize(content);
-    return (
-      <div
-        className="prose prose-sm max-w-none"
-        dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
-      />
-    );
-  } else {
-    // For plain text or markdown, render with basic formatting
-    // Check if content contains markdown-like syntax
-    if (content.includes('# ') || content.includes('*') || content.includes('- ') || content.includes('[') && content.includes('](')) {
-      // Process as markdown
-      const parsedMarkdown = marked.parse(content) as string;
-      const sanitizedMarkdown = DOMPurify.sanitize(parsedMarkdown);
-      return (
-        <div
-          className="prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: sanitizedMarkdown }}
-        />
-      );
-    } else {
-      // Plain text
-      return (
-        <div className="whitespace-pre-wrap break-words">
-          {content}
-        </div>
-      );
-    }
-  }
+function stripMarkdown(input: string) {
+  return input
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/^>\s?/gm, "");
+}
+
+function normalizeText(input: string) {
+  return input.replace(/\s+/g, " ").trim();
+}
+
+export function RichContentViewer({ content }: RichContentViewerProps) {
+  const plainText = normalizeText(stripMarkdown(stripHtml(content)));
+
+  return <div className="whitespace-pre-wrap break-words">{plainText || content}</div>;
 }
