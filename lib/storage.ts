@@ -1,16 +1,19 @@
 import { sampleNotes } from "@/lib/sample-notes";
 import { Note } from "@/lib/types";
 
-const STORAGE_KEY = "second-brain-notes";
+function getStorageKey(userId: string) {
+  return `second-brain-notes:${userId}`;
+}
 
-export function loadNotes(): Note[] {
+export function loadNotes(userId: string): Note[] {
   if (typeof window === "undefined") {
     return sampleNotes;
   }
 
-  const saved = window.localStorage.getItem(STORAGE_KEY);
+  const storageKey = getStorageKey(userId);
+  const saved = window.localStorage.getItem(storageKey);
   if (!saved) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
+    window.localStorage.setItem(storageKey, JSON.stringify(sampleNotes));
     return sampleNotes;
   }
 
@@ -24,18 +27,18 @@ export function loadNotes(): Note[] {
       return normalized;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
+    window.localStorage.setItem(storageKey, JSON.stringify(sampleNotes));
     return sampleNotes;
   } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleNotes));
+    window.localStorage.setItem(storageKey, JSON.stringify(sampleNotes));
     return sampleNotes;
   }
 }
 
-export function saveNotes(notes: Note[]) {
+export function saveNotes(userId: string, notes: Note[]) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  window.localStorage.setItem(getStorageKey(userId), JSON.stringify(notes));
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, MoonStar, Search, SunMedium, X } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
 interface TopBarProps {
@@ -9,9 +10,19 @@ interface TopBarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onClearSearch?: () => void;
+  userName: string;
+  onLogout: () => void;
 }
 
-export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange, onClearSearch }: TopBarProps) {
+export function TopBar({
+  onOpenMenu,
+  noteCount,
+  searchQuery,
+  onSearchChange,
+  onClearSearch,
+  userName,
+  onLogout,
+}: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -36,6 +47,9 @@ export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange, onC
           <div className="hidden rounded-full bg-muted px-3 py-1.5 text-sm text-foreground/60 sm:block">
             {noteCount} 条知识卡片
           </div>
+          <div className="hidden rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-sm text-foreground/60 lg:block">
+            {userName}
+          </div>
           <button
             type="button"
             onClick={toggleTheme}
@@ -43,6 +57,14 @@ export function TopBar({ onOpenMenu, noteCount, searchQuery, onSearchChange, onC
           >
             {theme === "light" ? <MoonStar className="h-4 w-4" /> : <SunMedium className="h-4 w-4" />}
             <span className="hidden sm:inline">{theme === "light" ? "Dark" : "Light"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="inline-flex items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 py-2 text-sm text-foreground/70 transition hover:border-primary/20 hover:text-primary"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">退出</span>
           </button>
         </div>
       </div>

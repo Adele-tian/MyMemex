@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownAZ, ArrowUpAZ, Clock3, History, SquarePen, Filter, Bookmark, Calendar, X, DatabaseBackup, BarChart3, Settings } from "lucide-react";
 import { DataVisualization } from "@/components/data-visualization";
+import { AuthScreen } from "@/components/auth-screen";
 import { EmptyState } from "@/components/empty-state";
 import { ExportImportPanel } from "@/components/export-import-panel";
 import { InspirationInput } from "@/components/inspiration-input";
@@ -14,6 +15,7 @@ import { Sidebar } from "@/components/sidebar";
 import { TagSuggestion } from "@/components/tag-suggestion";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
+import { clearSessionUser, getSessionUser, SessionUser } from "@/lib/auth";
 import { sampleNotes } from "@/lib/sample-notes";
 import { loadNotes, saveNotes } from "@/lib/storage";
 import { Note, ViewFilter, SavedSearch } from "@/lib/types";
@@ -57,6 +59,7 @@ function getDailyReviewNotes(notes: Note[]) {
 }
 
 function AppContent() {
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -77,7 +80,9 @@ function AppContent() {
   const [excludeTags, setExcludeTags] = useState<string[]>([]);
 
   useEffect(() => {
-    setNotes(loadNotes());
+    const sessionUser = getSessionUser();
+    setUser(sessionUser);
+    setNotes(sessionUser ? loadNotes(sessionUser.id) : []);
     setHydrated(true);
 
     // Load saved searches from localStorage
@@ -92,16 +97,16 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (hydrated) {
-      saveNotes(notes);
+    if (hydrated && user) {
+      saveNotes(user.id, notes);
     }
-  }, [hydrated, notes]);
+  }, [hydrated, notes, user]);
 
   useEffect(() => {
-    if (hydrated && notes.length === 0) {
+    if (hydrated && user && notes.length === 0) {
       setNotes(sampleNotes);
     }
-  }, [hydrated, notes]);
+  }, [hydrated, notes, user]);
 
   // Save searches to localStorage whenever they change
   useEffect(() => {
@@ -299,8 +304,36 @@ function AppContent() {
     setExcludeTags(excludeTags.filter(t => t !== tag));
   };
 
+  const handleAuthenticated = (nextUser: SessionUser) => {
+    setUser(nextUser);
+    setNotes(loadNotes(nextUser.id));
+    setFilter("all");
+    setShowCapture(true);
+    setSearchQuery("");
+  };
+
+  const handleLogout = () => {
+    clearSessionUser();
+    setUser(null);
+    setNotes([]);
+    setEditingNote(null);
+    setSearchQuery("");
+    setSelectedTags([]);
+    setExcludeTags([]);
+    setShowCapture(true);
+    setFilter("all");
+  };
+
   const showSortControls = !showCapture || searchQuery.trim().length > 0;
   const showDailyReview = showCapture && filter === "all" && searchQuery.trim().length === 0;
+
+  if (hydrated && !user) {
+    return (
+      <div className="min-h-screen bg-paper">
+        <AuthScreen onAuthenticated={handleAuthenticated} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-paper">
@@ -339,13 +372,15 @@ function AppContent() {
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               onClearSearch={handleClearSearch}
+              userName={user?.name ?? "访客"}
+              onLogout={handleLogout}
             />
           )}
 
           <div className="mt-6 space-y-6">
             {(showCapture && filter !== "visualization") && <InspirationInput onSubmit={handleCreateNote} />}
 
-            {showDailyReview && dailyReviewNotes.length > 0 && filter !== "visualization" && (
+            {showDailyReview && dailyReviewNotes.length > 0 && (
               <section>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
