@@ -1,9 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
-import { PrismaClient } from '@/lib/generated/prisma/client';
-
-const prisma = new PrismaClient();
+import { authOptions } from '@/lib/auth-options';
+import prisma from '@/lib/prisma';
 
 // 更新笔记
 export async function PUT(request: NextRequest) {
@@ -14,8 +12,8 @@ export async function PUT(request: NextRequest) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user?.id;
-    const { id, title, content, tags } = await request.json();
+    const userId = session.user.id;
+    const { id, title, content, tags, entryDate, moodLevel } = await request.json();
 
     // 确保用户只能更新自己的笔记
     const existingNote = await prisma.note.findFirst({
@@ -35,13 +33,15 @@ export async function PUT(request: NextRequest) {
         title,
         content,
         tags: Array.isArray(tags) ? tags.join(',') : (tags || ''),
+        entryDate: entryDate ? new Date(`${entryDate}T00:00:00.000Z`) : existingNote.entryDate,
+        moodLevel: typeof moodLevel === "number" ? moodLevel : null,
         updatedAt: new Date(),
       },
     });
 
-    // 将逗号分隔的标签字符串转换回数组格式
     const noteWithTagsArray = {
       ...updatedNote,
+      entryDate: updatedNote.entryDate.toISOString(),
       tags: updatedNote.tags ? updatedNote.tags.split(',').filter(tag => tag.trim()) : []
     };
 
@@ -64,7 +64,7 @@ export async function DELETE(request: NextRequest) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user?.id;
+    const userId = session.user.id;
     const { id } = await request.json(); // 从请求体中获取笔记ID
 
     // 确保用户只能删除自己的笔记

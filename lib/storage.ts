@@ -1,5 +1,19 @@
 import { sampleNotes } from "@/lib/sample-notes";
-import { Note } from "@/lib/types";
+import { HabitCheckin, HabitKey, Note } from "@/lib/types";
+import { extractTitle, toDateOnly } from "@/lib/utils";
+
+function normalizeNote(note: any): Note {
+  return {
+    id: note.id,
+    title: note.title || extractTitle(note.content),
+    content: note.content,
+    tags: Array.isArray(note.tags) ? note.tags : (note.tags ? note.tags.split(',').filter((tag: string) => tag.trim()) : []),
+    entryDate: note.entryDate ? toDateOnly(note.entryDate) : toDateOnly(note.createdAt),
+    moodLevel: typeof note.moodLevel === "number" ? note.moodLevel : undefined,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  };
+}
 
 // 当应用处于服务器端或未登录状态下，返回示例数据
 export async function loadNotes(): Promise<Note[]> {
@@ -21,14 +35,7 @@ export async function loadNotes(): Promise<Note[]> {
     }
 
     const notes = await response.json();
-    return notes.map((note: any) => ({
-      id: note.id,
-      title: note.title,
-      content: note.content,
-      tags: Array.isArray(note.tags) ? note.tags : (note.tags ? note.tags.split(',').filter((tag: string) => tag.trim()) : []),
-      createdAt: note.createdAt,
-      updatedAt: note.updatedAt,
-    }));
+    return notes.map(normalizeNote);
   } catch (error) {
     console.error('加载笔记时发生错误:', error);
     return sampleNotes;
@@ -51,7 +58,7 @@ export async function saveNotes(notes: Note[]): Promise<void> {
   }
 }
 
-// 创建单个笔记
+// 创建单个日记
 export async function createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note | null> {
   if (typeof window === "undefined") {
     return null;
@@ -64,9 +71,11 @@ export async function createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'upda
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: noteData.title,
+        title: noteData.title || extractTitle(noteData.content),
         content: noteData.content,
         tags: noteData.tags,
+        entryDate: noteData.entryDate,
+        moodLevel: noteData.moodLevel,
       }),
     });
 
@@ -78,14 +87,7 @@ export async function createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'upda
     }
 
     const newNote = await response.json();
-    return {
-      id: newNote.id,
-      title: newNote.title,
-      content: newNote.content,
-      tags: Array.isArray(newNote.tags) ? newNote.tags : (newNote.tags ? newNote.tags.split(',').filter((tag: string) => tag.trim()) : []),
-      createdAt: newNote.createdAt,
-      updatedAt: newNote.updatedAt,
-    };
+    return normalizeNote(newNote);
   } catch (error) {
     console.error('创建笔记时发生错误:', error);
     throw error;
@@ -106,9 +108,11 @@ export async function updateNote(note: Note): Promise<Note | null> {
       },
       body: JSON.stringify({
         id: note.id,
-        title: note.title,
+        title: note.title || extractTitle(note.content),
         content: note.content,
         tags: note.tags,
+        entryDate: note.entryDate,
+        moodLevel: note.moodLevel,
       }),
     });
 
@@ -120,14 +124,7 @@ export async function updateNote(note: Note): Promise<Note | null> {
     }
 
     const updatedNote = await response.json();
-    return {
-      id: updatedNote.id,
-      title: updatedNote.title,
-      content: updatedNote.content,
-      tags: Array.isArray(updatedNote.tags) ? updatedNote.tags : (updatedNote.tags ? updatedNote.tags.split(',').filter((tag: string) => tag.trim()) : []),
-      createdAt: updatedNote.createdAt,
-      updatedAt: updatedNote.updatedAt,
-    };
+    return normalizeNote(updatedNote);
   } catch (error) {
     console.error('更新笔记时发生错误:', error);
     throw error;
@@ -159,6 +156,67 @@ export async function deleteNote(noteId: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('删除笔记时发生错误:', error);
+    throw error;
+  }
+}
+
+export async function loadHabitCheckins(): Promise<HabitCheckin[]> {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const response = await fetch("/api/habits");
+    if (!response.ok) {
+      if (response.status === 401) {
+        return [];
+      }
+      throw new Error(`加载打卡失败: ${response.statusText}`);
+    }
+
+    const checkins = await response.json();
+    return checkins.map((item: any) => ({
+      id: item.id,
+      date: toDateOnly(item.date),
+      habitKey: item.habitKey as HabitKey,
+      completed: Boolean(item.completed),
+    }));
+  } catch (error) {
+    console.error("加载习惯打卡时发生错误:", error);
+    return [];
+  }
+}
+
+export async function saveHabitCheckin(checkin: HabitCheckin): Promise<HabitCheckin | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const response = await fetch("/api/habits", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(checkin),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("用户未登录");
+      }
+      throw new Error(`保存打卡失败: ${response.statusText}`);
+    }
+
+    const item = await response.json();
+    return {
+      id: item.id,
+      date: toDateOnly(item.date),
+      habitKey: item.habitKey as HabitKey,
+      completed: Boolean(item.completed),
+    };
+  } catch (error) {
+    console.error("保存习惯打卡时发生错误:", error);
     throw error;
   }
 }

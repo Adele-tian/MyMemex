@@ -29,7 +29,7 @@ export function importNotesFromJson(jsonString: string): Note[] {
     if (parsed.version && parsed.notes && Array.isArray(parsed.notes)) {
       // Validate that imported data has the required fields for Note objects
       const importedNotes: Note[] = parsed.notes.filter((note: any) => {
-        return note.id && note.title && note.content && note.tags &&
+        return note.id && note.content && note.tags &&
                note.createdAt && note.updatedAt;
       });
 
@@ -50,8 +50,10 @@ export function exportNotesToMarkdown(notes: Note[]): { [filename: string]: stri
   const files: { [filename: string]: string } = {};
 
   notes.forEach(note => {
+    const noteTitle = note.title || "未命名日记";
+
     // Sanitize title for filename
-    const sanitizedTitle = note.title
+    const sanitizedTitle = noteTitle
       .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid filename characters
       .replace(/\s+/g, '_') // Replace spaces with underscores
       .substring(0, 50); // Limit length
@@ -59,7 +61,7 @@ export function exportNotesToMarkdown(notes: Note[]): { [filename: string]: stri
     const filename = `${sanitizedTitle}_${note.id.substring(0, 8)}.md`;
 
     // Create markdown content
-    const markdownContent = `# ${note.title}\n\n${note.content}\n\n---\n*Created: ${note.createdAt}*\n*Updated: ${note.updatedAt}*\n*Tags: ${note.tags.join(', ')}*`;
+    const markdownContent = `# ${noteTitle}\n\n${note.content}\n\n---\n*Created: ${note.createdAt}*\n*Updated: ${note.updatedAt}*\n*Tags: ${note.tags.join(', ')}*`;
 
     files[filename] = markdownContent;
   });

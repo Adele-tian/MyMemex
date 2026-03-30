@@ -38,14 +38,14 @@ export function TopBar({
             <Menu className="h-4 w-4" />
           </button>
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Personal Knowledge Base</p>
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">Second Brain</h2>
+            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Private Diary</p>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">我的日记站</h2>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="hidden rounded-full bg-muted px-3 py-1.5 text-sm text-foreground/60 sm:block">
-            {noteCount} 条知识卡片
+            {noteCount} 条日记
           </div>
           <div className="hidden rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-sm text-foreground/60 lg:block">
             {userName}
@@ -75,7 +75,7 @@ export function TopBar({
           <input
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="搜索标题、内容或标签 (支持高级语法: tag:tagName, 'exact phrase')"
+            placeholder="搜索日期、标题或正文内容"
             className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/35"
           />
         </label>

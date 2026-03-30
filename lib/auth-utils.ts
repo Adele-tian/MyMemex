@@ -1,10 +1,8 @@
 // 此文件仅用于服务器端操作
 // 客户端认证相关功能应使用 NextAuth API 路由
 
-import { PrismaClient } from '@/lib/generated/prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcrypt';
-
-const prisma = new PrismaClient();
 
 // 注册新用户 - 仅在服务器端使用
 export async function registerUser(email: string, password: string, name?: string) {

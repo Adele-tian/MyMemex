@@ -23,6 +23,7 @@ model User {
 
   // Relations
   notes          Note[]
+  habitCheckins  HabitCheckin[]
 
   @@map("users")
 }
@@ -33,10 +34,26 @@ model Note {
   title       String
   content     String
   tags        String   // Store as comma-separated string for SQLite compatibility
+  entryDate   DateTime @default(now())
+  moodLevel   Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
   @@map("notes")
+}
+
+model HabitCheckin {
+  id         String   @id @default(cuid())
+  date       DateTime
+  habitKey   String
+  completed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date, habitKey])
+  @@map("habit_checkins")
 }

@@ -69,7 +69,7 @@ export function NoteEditorModal({ note, open, onClose, onSave, allKnownTags = []
       <div className="w-full max-w-3xl rounded-[2rem] border border-border/70 bg-card p-5 shadow-soft sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Edit Note</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Edit Diary</p>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{note.title}</h3>
             <p className="mt-2 text-sm text-foreground/55">
               <button
@@ -97,7 +97,7 @@ export function NoteEditorModal({ note, open, onClose, onSave, allKnownTags = []
             <RichTextEditor
               content={draft}
               onChange={setDraft}
-              placeholder="在这里输入笔记内容..."
+              placeholder="在这里继续整理今天的感受..."
             />
           ) : (
             <textarea

@@ -1,8 +1,6 @@
-import { PrismaClient } from '@/lib/generated/prisma/client';
+import prisma from '@/lib/prisma';
 import { Note } from '@/lib/types';
 import { loadNotes } from '@/lib/storage';
-
-const prisma = new PrismaClient();
 
 // 从localStorage加载现有笔记并迁移到数据库
 export async function migrateLocalStorageData(userId: string) {
@@ -50,9 +48,11 @@ export async function migrateLocalStorageData(userId: string) {
         await prisma.note.create({
           data: {
             id: note.id,
-            title: note.title,
+            title: note.title || "历史日记",
             content: note.content,
-            tags: note.tags || [],
+            tags: Array.isArray(note.tags) ? note.tags.join(",") : "",
+            entryDate: note.entryDate ? new Date(`${note.entryDate}T00:00:00.000Z`) : new Date(note.createdAt),
+            moodLevel: typeof note.moodLevel === "number" ? note.moodLevel : null,
             createdAt: new Date(note.createdAt),
             updatedAt: new Date(note.updatedAt),
             userId,

@@ -4,6 +4,41 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
+import { loadUsers } from '@/lib/auth';
+
+async function tryMigrateLegacyAccount(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const legacyUsers = loadUsers();
+  const legacyUser = legacyUsers.find(
+    (user) => user.email.trim().toLowerCase() === normalizedEmail && user.password === password,
+  );
+
+  if (!legacyUser) {
+    return false;
+  }
+
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: legacyUser.email,
+      password,
+      name: legacyUser.name,
+    }),
+  });
+
+  return response.ok || response.status === 409;
+}
+
+function getReadableError(error: string) {
+  if (error === 'CredentialsSignin') {
+    return '邮箱或密码不正确。如果这是你旧版本的账号，我已经尝试自动迁移；如果还是不行，可能旧账号数据已经不在当前浏览器里了。';
+  }
+
+  return error;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,14 +53,26 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await signIn('credentials', {
+      let res = await signIn('credentials', {
         redirect: false,
         email,
         password,
       });
 
+      if (res?.error === 'CredentialsSignin') {
+        const migrated = await tryMigrateLegacyAccount(email, password);
+
+        if (migrated) {
+          res = await signIn('credentials', {
+            redirect: false,
+            email,
+            password,
+          });
+        }
+      }
+
       if (res?.error) {
-        setError(res.error);
+        setError(getReadableError(res.error));
         setIsLoading(false);
         return;
       }

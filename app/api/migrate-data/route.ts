@@ -1,10 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route';
-import { PrismaClient } from '@/lib/generated/prisma/client';
-import { Note } from '@/lib/types';
-
-const prisma = new PrismaClient();
+import { authOptions } from '@/lib/auth-options';
+import prisma from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { notes } = await request.json();
-    const userId = session.user?.id;
+    const userId = session.user.id;
 
     if (!Array.isArray(notes)) {
       return new Response('Invalid data format', { status: 400 });
@@ -45,9 +42,11 @@ export async function POST(request: NextRequest) {
         await prisma.note.create({
           data: {
             id: note.id,
-            title: note.title,
+            title: note.title || '历史日记',
             content: note.content,
-            tags: note.tags || [],
+            tags: Array.isArray(note.tags) ? note.tags.join(',') : '',
+            entryDate: note.entryDate ? new Date(`${note.entryDate}T00:00:00.000Z`) : new Date(note.createdAt),
+            moodLevel: typeof note.moodLevel === "number" ? note.moodLevel : null,
             createdAt: new Date(note.createdAt),
             updatedAt: new Date(note.updatedAt),
             userId,

@@ -1,355 +1,204 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownAZ, ArrowUpAZ, Clock3, History, SquarePen, Filter, Bookmark, Calendar, X, DatabaseBackup, BarChart3, Settings, LogOut } from "lucide-react";
+import { SessionProvider, signOut, useSession } from "next-auth/react";
+import { CalendarDays, Heart, Sparkles } from "lucide-react";
 import { DataVisualization } from "@/components/data-visualization";
 import { EmptyState } from "@/components/empty-state";
-import { ExportImportPanel } from "@/components/export-import-panel";
 import { InspirationInput } from "@/components/inspiration-input";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { NoteCard } from "@/components/note-card";
 import { NoteEditorModal } from "@/components/note-editor-modal";
 import { SettingsPanel } from "@/components/settings-panel";
 import { Sidebar } from "@/components/sidebar";
-import { TagSuggestion } from "@/components/tag-suggestion";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
-import { sampleNotes } from "@/lib/sample-notes";
-import { loadNotes, createNote, updateNote, deleteNote } from "@/lib/storage";
-import { Note, ViewFilter, SavedSearch } from "@/lib/types";
-import { extractTags, extractTitle, suggestTags } from "@/lib/utils";
-import { parseSearchQuery, performSearch, SearchOptions } from "@/lib/search-utils";
-import { signOut, useSession } from 'next-auth/react';
-
-type SortField = "updatedAt" | "createdAt";
-type SortDirection = "desc" | "asc";
-
-function getDailyReviewNotes(notes: Note[]) {
-  const now = new Date();
-  const daySeed = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-
-  const candidates = notes.filter((note) => {
-    const ageMs = now.getTime() - new Date(note.createdAt).getTime();
-    return ageMs >= 24 * 60 * 60 * 1000;
-  });
-
-  const source = candidates.length >= 3 ? candidates : notes;
-
-  return [...source]
-    .map((note) => {
-      const createdAgeDays = Math.max(
-        1,
-        Math.floor((now.getTime() - new Date(note.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
-      );
-      const updatedAgeDays = Math.max(
-        1,
-        Math.floor((now.getTime() - new Date(note.updatedAt).getTime()) / (24 * 60 * 60 * 1000)),
-      );
-      const jitter = [...`${daySeed}-${note.id}`].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 7;
-
-      return {
-        note,
-        score: createdAgeDays * 0.65 + updatedAgeDays * 0.35 + jitter * 0.1,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((item) => item.note);
-}
+import { DiaryEntry, HABIT_DEFINITIONS, HabitCheckin, MoodLevel, Note, ViewFilter } from "@/lib/types";
+import { createNote, deleteNote, loadHabitCheckins, loadNotes, saveHabitCheckin, updateNote } from "@/lib/storage";
+import { extractTags, extractTitle, formatFullDate, getMoodEmoji, getMoodLabel, suggestTags, toDateOnly } from "@/lib/utils";
 
 function AppContent() {
   const { data: session, status } = useSession();
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [habitCheckins, setHabitCheckins] = useState<HabitCheckin[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [filter, setFilter] = useState<ViewFilter>("all");
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [showCapture, setShowCapture] = useState(true);
+  const [filter, setFilter] = useState<ViewFilter>("home");
+  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<SortField>("updatedAt");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
 
-  // Advanced search options
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [excludeTags, setExcludeTags] = useState<string[]>([]);
+  const today = toDateOnly(new Date());
 
   useEffect(() => {
-    async function fetchNotes() {
-      if (status === 'authenticated') {
-        const loadedNotes = await loadNotes();
-        setNotes(loadedNotes);
+    async function fetchData() {
+      if (status !== "authenticated") {
+        setEntries(await loadNotes());
+        setHabitCheckins([]);
         setHydrated(true);
-      } else if (status === 'unauthenticated') {
-        // 如果用户未登录，可以显示示例数据或重定向到登录页
-        setNotes(sampleNotes);
-        setHydrated(true);
+        return;
       }
+
+      const [loadedEntries, loadedCheckins] = await Promise.all([loadNotes(), loadHabitCheckins()]);
+      setEntries(loadedEntries);
+      setHabitCheckins(loadedCheckins);
+      setHydrated(true);
     }
 
-    fetchNotes();
-
-    // Load saved searches from localStorage
-    const saved = localStorage.getItem("mymemex-saved-searches");
-    if (saved) {
-      try {
-        setSavedSearches(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse saved searches", e);
-      }
-    }
+    void fetchData();
   }, [status]);
 
-  useEffect(() => {
-    if (hydrated && notes.length === 0 && status === 'authenticated') {
-      // 如果用户已登录但没有笔记，可以显示空状态或欢迎信息
-      console.log('用户已登录但没有笔记');
-    }
-  }, [hydrated, notes, status]);
-
-  // Save searches to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("mymemex-saved-searches", JSON.stringify(savedSearches));
-  }, [savedSearches]);
-
-  const tags = useMemo(
-    () => Array.from(new Set(notes.flatMap((note) => note.tags))).sort((a, b) => a.localeCompare(b)),
-    [notes],
+  const todayEntries = useMemo(
+    () => entries.filter((entry) => entry.entryDate === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [entries, today],
   );
 
-  const dailyReviewNotes = useMemo(() => getDailyReviewNotes(notes), [notes]);
+  const visibleEntries = useMemo(() => {
+    let scoped = [...entries];
 
-  const filteredNotes = useMemo(() => {
-    // If we have an active search query, use advanced search
+    if (filter === "today") {
+      scoped = scoped.filter((entry) => entry.entryDate === today);
+    } else if (filter === "home") {
+      scoped = scoped.slice(0, 6);
+    }
+
     if (searchQuery.trim()) {
-      // Prepare search options
-      const searchOptions: SearchOptions = {
-        query: searchQuery,
-        sortBy: sortField === 'updatedAt' || sortField === 'createdAt' ? 'date' : 'relevance',
-        sortOrder: sortDirection,
-      };
-
-      // Add date filters if specified
-      if (dateFrom) {
-        searchOptions.dateFrom = new Date(dateFrom);
-      }
-      if (dateTo) {
-        searchOptions.dateTo = new Date(dateTo);
-      }
-
-      // Add tag filters if specified
-      if (selectedTags.length > 0) {
-        searchOptions.tags = selectedTags;
-      }
-      if (excludeTags.length > 0) {
-        searchOptions.excludeTags = excludeTags;
-      }
-
-      // Perform advanced search
-      const searchResults = performSearch(notes, searchOptions);
-      return searchResults.map(result =>
-        notes.find(note => note.id === result.noteId) as Note
-      ).filter(Boolean) as Note[];
+      const query = searchQuery.trim().toLowerCase();
+      scoped = scoped.filter((entry) =>
+        [entry.title, entry.content, entry.entryDate, ...entry.tags].filter(Boolean).join(" ").toLowerCase().includes(query),
+      );
     }
 
-    // If filter is settings, return empty array (settings view doesn't show notes)
-    if (filter === "settings") {
-      return [];
-    }
+    return scoped.sort((a, b) => `${b.entryDate}${b.createdAt}`.localeCompare(`${a.entryDate}${a.createdAt}`));
+  }, [entries, filter, searchQuery, today]);
 
-    // If filter is visualization, return empty array (visualization view doesn't show notes)
-    if (filter === "visualization") {
-      return [];
-    }
+  const todayMood = useMemo(() => {
+    const moodEntry = todayEntries.find((entry) => entry.moodLevel);
+    return moodEntry?.moodLevel;
+  }, [todayEntries]);
 
-    // Otherwise, use the original filtering logic
-    const scoped = [...notes]
-      .filter((note) => {
-        if (filter === "all") {
-          return true;
-        }
+  const handleCreateEntry = async (content: string) => {
+    const extractedTags = extractTags(content);
+    const allKnownTags = Array.from(new Set(entries.flatMap((entry) => entry.tags))).filter((tag) => !extractedTags.includes(tag));
+    const suggested = suggestTags(content, extractedTags, allKnownTags);
 
-        if (filter.startsWith("tag:")) {
-          const tag = filter.replace("tag:", "");
-          return note.tags.includes(tag);
-        }
-
-        return true;
-      });
-
-    return scoped.sort((a, b) => {
-      const left = new Date(a[sortField]).getTime();
-      const right = new Date(b[sortField]).getTime();
-      return sortDirection === "desc" ? right - left : left - right;
+    const newEntry = await createNote({
+      title: extractTitle(content),
+      content,
+      tags: Array.from(new Set([...extractedTags, ...suggested.slice(0, 2)])),
+      entryDate: today,
+      moodLevel: todayMood,
     });
-  }, [filter, notes, searchQuery, sortDirection, sortField, dateFrom, dateTo, selectedTags, excludeTags]);
 
-  const handleCreateNote = async (content: string) => {
-    const extractedTags = extractTags(content);
-
-    // Suggest additional tags based on content
-    const allKnownTags = tags.filter(tag => !extractedTags.includes(tag));
-    const suggestedTags = suggestTags(content, extractedTags, allKnownTags);
-    const combinedTags = Array.from(new Set([...extractedTags, ...suggestedTags.slice(0, 3)])); // Limit to 3 suggestions
-
-    try {
-      const newNote = await createNote({
-        title: extractTitle(content),
-        content,
-        tags: combinedTags,
-      });
-
-      if (newNote) {
-        setNotes((current) => [newNote, ...current]);
-        setFilter("all");
-        setShowCapture(true);
-      }
-    } catch (error) {
-      console.error('创建笔记失败:', error);
-      alert('创建笔记失败，请稍后重试');
+    if (newEntry) {
+      setEntries((current) => [newEntry, ...current]);
+      setFilter("home");
     }
   };
 
-  const handleSaveEdit = async (noteId: string, content: string) => {
-    const extractedTags = extractTags(content);
+  const handleSaveEdit = async (entryId: string, content: string) => {
+    const current = entries.find((entry) => entry.id === entryId);
+    if (!current) {
+      return;
+    }
 
-    // Suggest additional tags based on content
-    const allKnownTags = tags.filter(tag => !extractedTags.includes(tag));
-    const suggestedTags = suggestTags(content, extractedTags, allKnownTags);
-    const combinedTags = Array.from(new Set([...extractedTags, ...suggestedTags.slice(0, 3)])); // Limit to 3 suggestions
+    const updated = await updateNote({
+      ...current,
+      title: extractTitle(content),
+      content,
+      tags: extractTags(content),
+    });
 
-    try {
-      const updatedNote = await updateNote({
-        id: noteId,
-        title: extractTitle(content),
-        content,
-        tags: combinedTags,
-        createdAt: notes.find(n => n.id === noteId)?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      if (updatedNote) {
-        setNotes((current) =>
-          current.map((note) =>
-            note.id === noteId ? updatedNote : note,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error('更新笔记失败:', error);
-      alert('更新笔记失败，请稍后重试');
+    if (updated) {
+      setEntries((currentEntries) => currentEntries.map((entry) => (entry.id === entryId ? updated : entry)));
     }
   };
 
-  const handleDeleteNote = async (note: Note) => {
-    const confirmed = window.confirm(`确认删除「${note.title}」吗？这条知识卡片会从云端移除。`);
+  const handleDeleteEntry = async (entry: Note) => {
+    const confirmed = window.confirm(`确认删除 ${entry.entryDate} 这条日记吗？`);
     if (!confirmed) {
       return;
     }
 
-    try {
-      const success = await deleteNote(note.id);
-      if (success) {
-        setNotes((current) => current.filter((item) => item.id !== note.id));
-        if (editingNote?.id === note.id) {
-          setEditingNote(null);
-        }
+    const success = await deleteNote(entry.id);
+    if (success) {
+      setEntries((current) => current.filter((item) => item.id !== entry.id));
+      if (editingEntry?.id === entry.id) {
+        setEditingEntry(null);
       }
-    } catch (error) {
-      console.error('删除笔记失败:', error);
-      alert('删除笔记失败，请稍后重试');
     }
   };
 
-  const handleSelectFilter = (nextFilter: ViewFilter) => {
-    setFilter(nextFilter);
-    setShowCapture(false);
-  };
+  const handleMoodChange = async (level: MoodLevel) => {
+    if (todayEntries.length > 0) {
+      const target = todayEntries[0];
+      const updated = await updateNote({ ...target, moodLevel: level });
+      if (updated) {
+        setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      }
+      return;
+    }
 
-  const handleSaveCurrentSearch = () => {
-    if (!searchQuery.trim()) return;
-
-    const newSavedSearch: SavedSearch = {
-      id: crypto.randomUUID(),
-      name: `搜索: ${searchQuery.substring(0, 30)}${searchQuery.length > 30 ? '...' : ''}`,
-      query: searchQuery,
-      createdAt: new Date().toISOString(),
-    };
-
-    setSavedSearches(prev => [...prev, newSavedSearch]);
-  };
-
-  const handleImportNotes = (importedNotes: Note[]) => {
-    // Add imported notes to existing notes, avoiding duplicates by ID
-    setNotes(currentNotes => {
-      const currentIds = new Set(currentNotes.map(note => note.id));
-      const newNotes = importedNotes.filter(note => !currentIds.has(note.id));
-
-      return [...newNotes, ...currentNotes]; // New notes first
+    const created = await createNote({
+      title: "今天的心情记录",
+      content: "今天先记录一下自己的心情，稍后再补完整的日记内容。",
+      tags: [],
+      entryDate: today,
+      moodLevel: level,
     });
 
-    alert(`成功导入 ${importedNotes.length} 条笔记！`);
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setSelectedTags([]);
-    setExcludeTags([]);
-  };
-
-  const handleLoadSearch = (search: SavedSearch) => {
-    setSearchQuery(search.query);
-  };
-
-  const addSelectedTag = (tag: string) => {
-    if (!selectedTags.includes(tag)) {
-      setSelectedTags([...selectedTags, tag]);
+    if (created) {
+      setEntries((current) => [created, ...current]);
     }
   };
 
-  const removeSelectedTag = (tag: string) => {
-    setSelectedTags(selectedTags.filter(t => t !== tag));
-  };
+  const toggleHabit = async (habitKey: HabitCheckin["habitKey"]) => {
+    const current = habitCheckins.find((item) => item.date === today && item.habitKey === habitKey);
+    const next = await saveHabitCheckin({
+      date: today,
+      habitKey,
+      completed: !current?.completed,
+    });
 
-  const addExcludedTag = (tag: string) => {
-    if (!excludeTags.includes(tag)) {
-      setExcludeTags([...excludeTags, tag]);
+    if (next) {
+      setHabitCheckins((existing) => {
+        const rest = existing.filter((item) => !(item.date === today && item.habitKey === habitKey));
+        return [...rest, next];
+      });
     }
   };
 
-  const removeExcludedTag = (tag: string) => {
-    setExcludeTags(excludeTags.filter(t => t !== tag));
-  };
+  const todayHabitMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const item of habitCheckins) {
+      if (item.date === today) {
+        map.set(item.habitKey, item.completed);
+      }
+    }
+    return map;
+  }, [habitCheckins, today]);
 
-  const showSortControls = !showCapture || searchQuery.trim().length > 0;
-  const showDailyReview = showCapture && filter === "all" && searchQuery.trim().length === 0;
-
-  // 如果用户未认证且正在访问受保护的页面，可以显示加载状态或重定向
-  if (status === 'loading') {
+  if (status === "loading" || !hydrated) {
     return <div className="min-h-screen flex items-center justify-center bg-paper">正在加载...</div>;
   }
 
   return (
     <div className="min-h-screen bg-paper">
       <NoteEditorModal
-        note={editingNote}
-        open={Boolean(editingNote)}
-        onClose={() => setEditingNote(null)}
+        note={editingEntry}
+        open={Boolean(editingEntry)}
+        onClose={() => setEditingEntry(null)}
         onSave={handleSaveEdit}
-        allKnownTags={tags}
+        allKnownTags={Array.from(new Set(entries.flatMap((entry) => entry.tags)))}
       />
 
       <MobileSidebar
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         currentFilter={filter}
-        onSelectFilter={handleSelectFilter}
-        tags={tags}
-        notesCount={notes.length}
+        onSelectFilter={setFilter}
+        tags={[]}
+        notesCount={entries.length}
       />
 
       <div className="mx-auto flex min-h-screen max-w-[1800px]">
@@ -357,326 +206,118 @@ function AppContent() {
           collapsed={collapsed}
           currentFilter={filter}
           onToggle={() => setCollapsed((value) => !value)}
-          onSelectFilter={handleSelectFilter}
-          tags={tags}
-          notesCount={notes.length}
+          onSelectFilter={setFilter}
+          tags={[]}
+          notesCount={entries.length}
         />
 
         <main className="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-          {filter !== "settings" && filter !== "visualization" && (
-            <TopBar
-              onOpenMenu={() => setMobileOpen(true)}
-              noteCount={notes.length}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onClearSearch={handleClearSearch}
-              userName={session?.user?.name || session?.user?.email || '访客'}
-              onLogout={() => signOut({ callbackUrl: '/login' })}
-            />
-          )}
+          <TopBar
+            onOpenMenu={() => setMobileOpen(true)}
+            noteCount={entries.length}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onClearSearch={() => setSearchQuery("")}
+            userName={session?.user?.name || session?.user?.email || "访客"}
+            onLogout={() => signOut({ callbackUrl: "/login" })}
+          />
 
           <div className="mt-6 space-y-6">
-            {(showCapture && filter !== "visualization") && <InspirationInput onSubmit={handleCreateNote} />}
+            {filter !== "settings" && (
+              <section className="rounded-[2rem] border border-border/70 bg-card/85 p-5 shadow-soft">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-accent/70 px-3 py-1 text-xs uppercase tracking-[0.22em] text-primary">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      Today
+                    </div>
+                    <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground">{formatFullDate(new Date().toISOString())}</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/60">
+                      先记录今天的心情，再完成习惯打卡，最后写下你今天最想记住的一件事。
+                    </p>
+                  </div>
 
-            {showDailyReview && dailyReviewNotes.length > 0 && filter !== "visualization" && (
+                  <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-4 lg:w-[360px]">
+                    <div className="flex items-center gap-2 text-sm text-foreground/55">
+                      <Heart className="h-4 w-4" />
+                      今日心情
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => void handleMoodChange(level as MoodLevel)}
+                          className={`rounded-2xl border px-4 py-3 text-sm transition ${
+                            todayMood === level
+                              ? "border-primary/30 bg-primary/10 text-primary"
+                              : "border-border/70 bg-card/70 text-foreground/70 hover:border-primary/20 hover:text-primary"
+                          }`}
+                        >
+                          <span className="mr-2">{getMoodEmoji(level)}</span>
+                          {getMoodLabel(level)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {HABIT_DEFINITIONS.map((habit) => {
+                    const completed = todayHabitMap.get(habit.key);
+                    return (
+                      <button
+                        key={habit.key}
+                        type="button"
+                        onClick={() => void toggleHabit(habit.key)}
+                        className={`rounded-[1.5rem] border p-4 text-left transition ${
+                          completed
+                            ? "border-primary/30 bg-primary/10"
+                            : "border-border/70 bg-background/70 hover:border-primary/20"
+                        }`}
+                      >
+                        <div className="text-2xl">{habit.icon}</div>
+                        <p className="mt-3 font-medium text-foreground">{habit.label}</p>
+                        <p className="mt-1 text-sm text-foreground/55">{completed ? "今天已完成" : "今天还没打卡"}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {(filter === "home" || filter === "today") && <InspirationInput onSubmit={(content) => void handleCreateEntry(content)} />}
+
+            {(filter === "home" || filter === "insights") && (
+              <DataVisualization entries={entries} habits={habitCheckins} />
+            )}
+
+            {filter === "settings" && (
+              <section>
+                <SettingsPanel notes={entries} onImportSuccess={(imported) => setEntries((current) => [...imported, ...current])} />
+              </section>
+            )}
+
+            {filter !== "settings" && (
               <section>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Today Review</p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">今日回顾</h3>
+                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">
+                      {filter === "today" ? "Today Diary" : filter === "all" ? "All Diaries" : "Recent Diaries"}
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                      {filter === "today" ? "今日日记" : filter === "all" ? "全部日记" : "最近日记"}
+                    </h3>
                   </div>
                   <p className="text-sm text-foreground/55">
-                    从旧笔记里自动挑选 3 条内容，帮助你在首页快速回顾重点。
+                    {searchQuery.trim() ? `当前搜索到 ${visibleEntries.length} 条结果` : "把每天的状态、感受和成长，慢慢记成自己的长期轨迹。"}
                   </p>
                 </div>
 
-                <div className="columns-1 gap-4 space-y-4 md:columns-2 xl:columns-3">
-                  {dailyReviewNotes.map((note) => (
-                    <NoteCard
-                      key={`review-${note.id}`}
-                      note={note}
-                      onEdit={setEditingNote}
-                      onDelete={handleDeleteNote}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Show Settings Panel when filter is "settings" */}
-            {filter === "settings" && (
-              <section>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">SETTINGS</p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">设置</h3>
-                  </div>
-                </div>
-
-                <SettingsPanel
-                  notes={notes}
-                  onImportSuccess={handleImportNotes}
-                />
-              </section>
-            )}
-
-            {/* Show Data Visualization when filter is "visualization" */}
-            {filter === "visualization" && (
-              <section>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">DATA ANALYTICS</p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">数据可视化</h3>
-                  </div>
-                </div>
-                <DataVisualization notes={notes} />
-              </section>
-            )}
-
-            {/* Show Knowledge Stream section only when not in settings or visualization view */}
-            {filter !== "settings" && filter !== "visualization" && (
-              <section>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Knowledge Stream</p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                      {filter === "all" && "全部卡片"}
-                      {filter.startsWith("tag:") && `#${filter.replace("tag:", "")}`}
-                      {searchQuery.trim() && `搜索结果: ${searchQuery}`}
-                    </h3>
-                  </div>
-                  {showSortControls ? (
-                    <div className="flex flex-col gap-3 sm:items-end">
-                      <div className="flex flex-wrap gap-2">
-                        {!showCapture && (
-                          <button
-                            type="button"
-                            onClick={() => setShowCapture(true)}
-                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
-                          >
-                            <SquarePen className="h-4 w-4" />
-                            打开灵感框
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setSortField("updatedAt")}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                            sortField === "updatedAt"
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                          }`}
-                        >
-                          <History className="h-4 w-4" />
-                          按修改时间
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSortField("createdAt")}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                            sortField === "createdAt"
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                          }`}
-                        >
-                          <Clock3 className="h-4 w-4" />
-                          按创建时间
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
-                          }
-                          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
-                        >
-                          {sortDirection === "desc" ? (
-                            <ArrowDownAZ className="h-4 w-4" />
-                          ) : (
-                            <ArrowUpAZ className="h-4 w-4" />
-                          )}
-                          {sortDirection === "desc" ? "从近到远" : "从远到近"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                            showAdvancedFilters
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/70 bg-card/70 text-foreground/65 hover:text-foreground"
-                          }`}
-                        >
-                          <Filter className="h-4 w-4" />
-                          高级筛选
-                        </button>
-                        {searchQuery.trim() && (
-                          <button
-                            type="button"
-                            onClick={handleSaveCurrentSearch}
-                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-2 text-sm text-foreground/65 transition hover:text-foreground"
-                          >
-                            <Bookmark className="h-4 w-4" />
-                            保存搜索
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Advanced Filters Panel */}
-                      {showAdvancedFilters && (
-                        <div className="mt-3 p-4 rounded-xl border border-border/70 bg-card/70">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <label className="block text-sm font-medium text-foreground/80 mb-1">开始日期</label>
-                              <input
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="w-full rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground/35"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-foreground/80 mb-1">结束日期</label>
-                              <input
-                                  type="date"
-                                  value={dateTo}
-                                  onChange={(e) => setDateTo(e.target.value)}
-                                  className="w-full rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground/35"
-                                />
-                            </div>
-                          </div>
-
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-foreground/80 mb-1">包含标签</label>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {tags.map(tag => (
-                                <button
-                                  key={`include-${tag}`}
-                                  type="button"
-                                  onClick={() => addSelectedTag(tag)}
-                                  className={`px-3 py-1 rounded-full text-xs ${
-                                    selectedTags.includes(tag)
-                                      ? 'bg-primary text-white'
-                                      : 'bg-border/30 text-foreground/70 hover:bg-border/50'
-                                  }`}
-                                >
-                                  #{tag}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {selectedTags.map(tag => (
-                                <span key={`sel-${tag}`} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary text-white text-xs">
-                                  #{tag}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSelectedTag(tag)}
-                                    className="ml-1"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-foreground/80 mb-1">排除标签</label>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {tags.map(tag => (
-                                <button
-                                  key={`exclude-${tag}`}
-                                  type="button"
-                                  onClick={() => addExcludedTag(tag)}
-                                  className={`px-3 py-1 rounded-full text-xs ${
-                                    excludeTags.includes(tag)
-                                      ? 'bg-destructive text-white'
-                                      : 'bg-border/30 text-foreground/70 hover:bg-border/50'
-                                  }`}
-                                >
-                                  #{tag}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {excludeTags.map(tag => (
-                                <span key={`exc-${tag}`} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive text-white text-xs">
-                                  #{tag}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeExcludedTag(tag)}
-                                    className="ml-1"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end mt-4">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDateFrom("");
-                                setDateTo("");
-                                setSelectedTags([]);
-                                setExcludeTags([]);
-                              }}
-                              className="px-3 py-1.5 rounded-lg border border-border/70 text-sm text-foreground/70 hover:bg-card/50"
-                            >
-                              清空筛选条件
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Saved Searches */}
-                      {savedSearches.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <span className="text-sm text-foreground/60">保存的搜索:</span>
-                          {savedSearches.map(search => (
-                            <button
-                              key={search.id}
-                              type="button"
-                              onClick={() => handleLoadSearch(search)}
-                              className="text-sm text-blue-600 hover:underline"
-                            >
-                              {search.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={handleClearSearch}
-                          className="text-sm text-foreground/60 hover:text-foreground"
-                        >
-                          清空搜索
-                        </button>
-                        <span className="text-sm text-foreground/55">
-                          {searchQuery.trim()
-                            ? `找到 ${filteredNotes.length} 条结果`
-                            : "浏览历史笔记，并按创建或修改时间切换排序。"}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-foreground/55">
-                      用轻量卡片整理碎片灵感，让知识自然沉淀并随时回看。
-                    </p>
-                  )}
-                </div>
-
-                {filteredNotes.length > 0 ? (
+                {visibleEntries.length > 0 ? (
                   <div className="columns-1 gap-4 space-y-4 md:columns-2 xl:columns-3">
-                    {filteredNotes.map((note) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        onEdit={setEditingNote}
-                        onDelete={handleDeleteNote}
-                      />
+                    {visibleEntries.map((entry) => (
+                      <NoteCard key={entry.id} note={entry} onEdit={setEditingEntry} onDelete={handleDeleteEntry} />
                     ))}
                   </div>
                 ) : (
@@ -693,8 +334,10 @@ function AppContent() {
 
 export function AppShell() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SessionProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SessionProvider>
   );
 }

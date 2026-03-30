@@ -7,6 +7,30 @@ export function formatDate(date: string) {
   }).format(new Date(date));
 }
 
+export function formatFullDate(date: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date(date));
+}
+
+export function formatEntryDate(date: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+  }).format(new Date(date));
+}
+
+export function toDateOnly(date: string | Date) {
+  const parsed = typeof date === "string" ? new Date(date) : date;
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function summarize(content: string, maxLength = 140) {
   const plainText = content
     .replace(/^#+\s/gm, "")
@@ -30,10 +54,44 @@ export function extractTitle(input: string) {
     .find(Boolean);
 
   if (!firstLine) {
-    return "Untitled Note";
+    return "未命名日记";
   }
 
   return firstLine.replace(/^#+\s*/, "").slice(0, 40);
+}
+
+export function getMoodLabel(level?: number) {
+  switch (level) {
+    case 1:
+      return "很低落";
+    case 2:
+      return "有点累";
+    case 3:
+      return "平稳";
+    case 4:
+      return "不错";
+    case 5:
+      return "很开心";
+    default:
+      return "未记录";
+  }
+}
+
+export function getMoodEmoji(level?: number) {
+  switch (level) {
+    case 1:
+      return "😞";
+    case 2:
+      return "😕";
+    case 3:
+      return "😌";
+    case 4:
+      return "🙂";
+    case 5:
+      return "😄";
+    default:
+      return "🫥";
+  }
 }
 
 export function extractTags(input: string) {

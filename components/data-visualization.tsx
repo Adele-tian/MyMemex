@@ -1,139 +1,151 @@
-import { Note } from "@/lib/types";
-import { calculateAnalytics, getStatisticsSummary, TagFrequency } from "@/lib/analytics-utils";
+import { DiaryEntry, HABIT_DEFINITIONS, HabitCheckin } from "@/lib/types";
+import { getMoodEmoji, getMoodLabel, toDateOnly } from "@/lib/utils";
 
 interface DataVisualizationProps {
-  notes: Note[];
+  entries: DiaryEntry[];
+  habits: HabitCheckin[];
 }
 
-export function DataVisualization({ notes }: DataVisualizationProps) {
-  if (notes.length === 0) {
-    return (
-      <div className="rounded-xl border border-border/70 bg-card/70 p-6 text-center">
-        <p className="text-foreground/60">暂无数据可显示，请先添加一些笔记。</p>
-      </div>
-    );
+function getRecentDates(days: number) {
+  const dates: string[] = [];
+  const now = new Date();
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const next = new Date(now);
+    next.setDate(now.getDate() - i);
+    dates.push(toDateOnly(next));
   }
 
-  const analytics = calculateAnalytics(notes);
-  const summary = getStatisticsSummary(notes);
+  return dates;
+}
 
-  // Prepare data for tag frequency chart (top 10)
-  const topTags: TagFrequency[] = analytics.tagFrequency.slice(0, 10);
+export function DataVisualization({ entries, habits }: DataVisualizationProps) {
+  const recentDates = getRecentDates(7);
+  const monthlyDates = getRecentDates(30);
 
-  // Find max count for scaling
-  const maxTagCount = topTags.length > 0 ? Math.max(...topTags.map(t => t.count)) : 1;
+  const moodByDate = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.moodLevel) {
+      const key = entry.entryDate;
+      const current = moodByDate.get(key);
+      if (!current || current < entry.moodLevel) {
+        moodByDate.set(key, entry.moodLevel);
+      }
+    }
+  }
+
+  const dailyMoodSeries = recentDates.map((date) => ({
+    date,
+    level: moodByDate.get(date),
+  }));
+
+  const habitMap = new Map<string, boolean>();
+  for (const item of habits) {
+    habitMap.set(`${item.date}-${item.habitKey}`, item.completed);
+  }
+
+  const currentStreak = (() => {
+    let streak = 0;
+    for (let i = monthlyDates.length - 1; i >= 0; i -= 1) {
+      const date = monthlyDates[i];
+      const hasEntry = entries.some((entry) => entry.entryDate === date);
+      if (hasEntry) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  })();
 
   return (
     <div className="space-y-6">
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <p className="text-sm text-foreground/60">总笔记数</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{summary.total}</p>
-        </div>
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <p className="text-sm text-foreground/60">本周新增</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{summary.createdThisWeek}</p>
-        </div>
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <p className="text-sm text-foreground/60">本月新增</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{summary.createdThisMonth}</p>
-        </div>
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <p className="text-sm text-foreground/60">最常用标签</p>
-          <p className="text-lg font-bold text-foreground mt-1 truncate">
-            {summary.mostUsedTag || '无'}
-          </p>
-        </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="日记总数" value={`${entries.length}`} />
+        <StatCard label="连续记录" value={`${currentStreak} 天`} />
+        <StatCard label="最近7天心情" value={`${dailyMoodSeries.filter((item) => item.level).length} 天`} />
+        <StatCard
+          label="本月打卡"
+          value={`${habits.filter((item) => item.completed && monthlyDates.includes(item.date)).length} 次`}
+        />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Activity Visualization */}
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <h3 className="text-lg font-semibold mb-4">最近30天活动</h3>
-          {analytics.dailyActivity.length > 0 ? (
-            <div className="space-y-2">
-              {analytics.dailyActivity.slice(-30).map((activity, index) => {
-                // Calculate percentage for bar width
-                const maxCount = Math.max(...analytics.dailyActivity.map(a => a.count));
-                const percentage = maxCount > 0 ? (activity.count / maxCount) * 100 : 0;
-
-                return (
-                  <div key={index} className="flex items-center">
-                    <span className="w-16 text-xs text-foreground/70">{activity.date.split('-').pop()}</span>
-                    <div className="flex-1 ml-2">
-                      <div className="h-4 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <span className="w-8 text-right text-xs text-foreground/70">{activity.count}</span>
-                  </div>
-                );
-              })}
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <section className="rounded-[1.7rem] border border-border/70 bg-card/80 p-5 shadow-soft">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Mood Rhythm</p>
+              <h3 className="mt-2 text-xl font-semibold text-foreground">最近 7 天情绪周期</h3>
             </div>
-          ) : (
-            <p className="text-foreground/60 text-center py-4">暂无最近活动数据</p>
-          )}
-        </div>
-
-        {/* Top Tags Visualization */}
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <h3 className="text-lg font-semibold mb-4">标签频率 Top 10</h3>
-          {topTags.length > 0 ? (
-            <div className="space-y-3">
-              {topTags.map((tag, index) => {
-                const percentage = (tag.count / maxTagCount) * 100;
-
-                return (
-                  <div key={index} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-foreground/80">#{tag.tag}</span>
-                      <span className="text-foreground/60">{tag.count}</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-foreground/60 text-center py-4">暂无标签数据</p>
-          )}
-        </div>
-      </div>
-
-      {/* Monthly Stats */}
-      {analytics.monthlyStats.length > 0 && (
-        <div className="rounded-xl border border-border/70 bg-card/70 p-4">
-          <h3 className="text-lg font-semibold mb-4">月度统计</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/30">
-                  <th className="pb-2 text-left text-foreground/70">月份</th>
-                  <th className="pb-2 text-right text-foreground/70">新增笔记</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.monthlyStats.map((stat, index) => (
-                  <tr key={index} className="border-b border-border/20 last:border-0">
-                    <td className="py-3 text-foreground">{stat.month}</td>
-                    <td className="py-3 text-right text-foreground">{stat.created}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        </div>
-      )}
+
+          <div className="mt-5 grid grid-cols-7 gap-3">
+            {dailyMoodSeries.map((item) => {
+              const height = item.level ? `${28 + item.level * 12}px` : "20px";
+              return (
+                <div key={item.date} className="flex flex-col items-center gap-2">
+                  <div className="flex h-36 items-end">
+                    <div
+                      className={`w-8 rounded-full transition ${
+                        item.level ? "bg-primary" : "bg-muted"
+                      }`}
+                      style={{ height }}
+                      title={item.level ? `${getMoodEmoji(item.level)} ${getMoodLabel(item.level)}` : "未记录"}
+                    />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg">{getMoodEmoji(item.level)}</div>
+                    <div className="text-xs text-foreground/55">{item.date.slice(5)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[1.7rem] border border-border/70 bg-card/80 p-5 shadow-soft">
+          <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Habit Rhythm</p>
+          <h3 className="mt-2 text-xl font-semibold text-foreground">最近 30 天习惯打卡</h3>
+
+          <div className="mt-5 space-y-4">
+            {HABIT_DEFINITIONS.map((habit) => (
+              <div key={habit.key}>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    {habit.icon} {habit.label}
+                  </span>
+                  <span className="text-xs text-foreground/55">
+                    {monthlyDates.filter((date) => habitMap.get(`${date}-${habit.key}`)).length} / 30
+                  </span>
+                </div>
+                <div className="grid grid-cols-10 gap-1">
+                  {monthlyDates.map((date) => {
+                    const completed = habitMap.get(`${date}-${habit.key}`);
+                    return (
+                      <div
+                        key={`${habit.key}-${date}`}
+                        className={`h-5 rounded-md ${
+                          completed ? "bg-primary" : "bg-muted"
+                        }`}
+                        title={`${habit.label} ${date} ${completed ? "已完成" : "未完成"}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.4rem] border border-border/70 bg-card/80 p-4 shadow-soft">
+      <p className="text-sm text-foreground/60">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }
