@@ -32,19 +32,37 @@ export function toDateOnly(date: string | Date) {
 }
 
 export function summarize(content: string, maxLength = 140) {
+  const structured = parseDiarySections(content);
+  const structuredText = [
+    structured.events,
+    structured.moodNote,
+    structured.reflection,
+    structured.tomorrow,
+    structured.photoNote,
+    structured.habitsNote,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const sourceText = structuredText || content;
   const plainText = content
+    .replace(/^@@JOURNAL_V1@@/g, "")
+    .replace(/[{}[\]"]/g, " ")
     .replace(/^#+\s/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\n+/g, " ")
     .trim();
+  const normalized = structuredText
+    ? structuredText.replace(/\n+/g, " ").trim()
+    : plainText || sourceText.replace(/\n+/g, " ").trim();
 
-  if (plainText.length <= maxLength) {
-    return plainText;
+  if (normalized.length <= maxLength) {
+    return normalized;
   }
 
-  return `${plainText.slice(0, maxLength).trim()}...`;
+  return `${normalized.slice(0, maxLength).trim()}...`;
 }
 
 export function extractTitle(input: string) {
@@ -92,6 +110,56 @@ export function getMoodEmoji(level?: number) {
     default:
       return "🫥";
   }
+}
+
+export interface DiarySections {
+  events: string;
+  moodNote: string;
+  reflection: string;
+  tomorrow: string;
+  photoNote: string;
+  habitsNote: string;
+}
+
+const EMPTY_SECTIONS: DiarySections = {
+  events: "",
+  moodNote: "",
+  reflection: "",
+  tomorrow: "",
+  photoNote: "",
+  habitsNote: "",
+};
+
+const JOURNAL_PREFIX = "@@JOURNAL_V1@@";
+
+export function parseDiarySections(content: string): DiarySections {
+  if (!content.startsWith(JOURNAL_PREFIX)) {
+    return {
+      ...EMPTY_SECTIONS,
+      events: content.trim(),
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(content.replace(JOURNAL_PREFIX, ""));
+    return {
+      ...EMPTY_SECTIONS,
+      ...parsed,
+    };
+  } catch {
+    return {
+      ...EMPTY_SECTIONS,
+      events: content.replace(JOURNAL_PREFIX, "").trim(),
+    };
+  }
+}
+
+export function serializeDiarySections(sections: DiarySections) {
+  return `${JOURNAL_PREFIX}${JSON.stringify(sections)}`;
+}
+
+export function hasStructuredDiaryContent(content: string) {
+  return content.startsWith(JOURNAL_PREFIX);
 }
 
 export function extractTags(input: string) {

@@ -24,20 +24,20 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside
-      className={`border-r border-border/70 bg-card/70 backdrop-blur-xl ${
+      className={`glass-card border-r border-white/45 ${
         mobileVisible ? "flex w-full" : "hidden lg:flex"
       } ${collapsed ? "w-24" : "w-80"} flex-col transition-all duration-300`}
     >
-      <div className="border-b border-border/70 px-4 py-5">
+      <div className="border-b border-white/45 px-4 py-5">
         <div className="flex items-start justify-between gap-3">
           <div className={collapsed ? "hidden" : "block flex-1"}>
-            <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Private Diary</p>
-            <h1 className="mt-2 text-xl font-semibold text-foreground">每日心情手账</h1>
+            <p className="text-xs uppercase tracking-[0.32em] text-foreground/45">Soft Archive</p>
+            <h1 className="font-display mt-2 text-3xl leading-none text-foreground">Journal</h1>
           </div>
           <button
             type="button"
             onClick={onToggle}
-            className="rounded-2xl border border-border/70 bg-background/80 p-2 text-foreground/70 transition hover:border-primary/30 hover:text-primary"
+            className="rounded-2xl border border-white/55 bg-white/60 p-2 text-foreground/70 transition hover:border-primary/30 hover:text-primary"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -46,7 +46,7 @@ export function Sidebar({
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto px-3 py-4">
-        <div className="rounded-3xl border border-border/60 bg-background/65 p-2 shadow-soft">
+        <div className="rounded-3xl border border-white/55 bg-white/45 p-2 shadow-soft">
           <NavButton
             collapsed={collapsed}
             active={currentFilter === "home"}
@@ -117,10 +117,10 @@ function NavButton({
       type="button"
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-[1.35rem] px-3 py-3 text-left transition ${
-        active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-muted/80 hover:text-foreground"
+        active ? "bg-gradient-to-r from-[#ffc6cf] to-[#dca4ff] text-white" : "text-foreground/70 hover:bg-white/65 hover:text-foreground"
       }`}
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-current/10 bg-background/75">
+      <span className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${active ? "border-white/20 bg-white/20" : "border-current/10 bg-white/70"}`}>
         {icon}
       </span>
       {!collapsed && (

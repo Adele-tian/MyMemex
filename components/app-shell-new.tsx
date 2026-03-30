@@ -2,10 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SessionProvider, signOut, useSession } from "next-auth/react";
-import { CalendarDays, Heart, Sparkles } from "lucide-react";
+import {
+  CalendarDays,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  Heart,
+  NotebookPen,
+  Save,
+  Sparkles,
+  Sunrise,
+} from "lucide-react";
 import { DataVisualization } from "@/components/data-visualization";
 import { EmptyState } from "@/components/empty-state";
-import { InspirationInput } from "@/components/inspiration-input";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { NoteCard } from "@/components/note-card";
 import { NoteEditorModal } from "@/components/note-editor-modal";
@@ -13,9 +23,35 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
-import { DiaryEntry, HABIT_DEFINITIONS, HabitCheckin, MoodLevel, Note, ViewFilter } from "@/lib/types";
+import {
+  DiaryEntry,
+  HABIT_DEFINITIONS,
+  HabitCheckin,
+  MoodLevel,
+  Note,
+  ViewFilter,
+} from "@/lib/types";
 import { createNote, deleteNote, loadHabitCheckins, loadNotes, saveHabitCheckin, updateNote } from "@/lib/storage";
-import { extractTags, extractTitle, formatFullDate, getMoodEmoji, getMoodLabel, suggestTags, toDateOnly } from "@/lib/utils";
+import {
+  extractTitle,
+  type DiarySections,
+  formatEntryDate,
+  formatFullDate,
+  getMoodEmoji,
+  getMoodLabel,
+  parseDiarySections,
+  serializeDiarySections,
+  toDateOnly,
+} from "@/lib/utils";
+
+const EMPTY_SECTIONS: DiarySections = {
+  events: "",
+  moodNote: "",
+  reflection: "",
+  tomorrow: "",
+  photoNote: "",
+  habitsNote: "",
+};
 
 function AppContent() {
   const { data: session, status } = useSession();
@@ -27,8 +63,12 @@ function AppContent() {
   const [filter, setFilter] = useState<ViewFilter>("home");
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [journalSections, setJournalSections] = useState<DiarySections>(EMPTY_SECTIONS);
+  const [isSavingSections, setIsSavingSections] = useState(false);
 
   const today = toDateOnly(new Date());
+  const selectedDateOnly = toDateOnly(selectedDate);
 
   useEffect(() => {
     async function fetchData() {
@@ -48,10 +88,21 @@ function AppContent() {
     void fetchData();
   }, [status]);
 
-  const todayEntries = useMemo(
-    () => entries.filter((entry) => entry.entryDate === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [entries, today],
+  const selectedDateEntries = useMemo(
+    () => entries.filter((entry) => entry.entryDate === selectedDateOnly).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [entries, selectedDateOnly],
   );
+
+  const selectedPrimaryEntry = selectedDateEntries[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedPrimaryEntry) {
+      setJournalSections(EMPTY_SECTIONS);
+      return;
+    }
+
+    setJournalSections(parseDiarySections(selectedPrimaryEntry.content));
+  }, [selectedPrimaryEntry]);
 
   const visibleEntries = useMemo(() => {
     let scoped = [...entries];
@@ -59,7 +110,7 @@ function AppContent() {
     if (filter === "today") {
       scoped = scoped.filter((entry) => entry.entryDate === today);
     } else if (filter === "home") {
-      scoped = scoped.slice(0, 6);
+      scoped = scoped.filter((entry) => entry.entryDate !== selectedDateOnly).slice(0, 6);
     }
 
     if (searchQuery.trim()) {
@@ -70,31 +121,73 @@ function AppContent() {
     }
 
     return scoped.sort((a, b) => `${b.entryDate}${b.createdAt}`.localeCompare(`${a.entryDate}${a.createdAt}`));
-  }, [entries, filter, searchQuery, today]);
+  }, [entries, filter, searchQuery, selectedDateOnly, today]);
 
-  const todayMood = useMemo(() => {
-    const moodEntry = todayEntries.find((entry) => entry.moodLevel);
+  const selectedMood = useMemo(() => {
+    const moodEntry = selectedDateEntries.find((entry) => entry.moodLevel);
     return moodEntry?.moodLevel;
-  }, [todayEntries]);
+  }, [selectedDateEntries]);
 
-  const handleCreateEntry = async (content: string) => {
-    const extractedTags = extractTags(content);
-    const allKnownTags = Array.from(new Set(entries.flatMap((entry) => entry.tags))).filter((tag) => !extractedTags.includes(tag));
-    const suggested = suggestTags(content, extractedTags, allKnownTags);
-
-    const newEntry = await createNote({
-      title: extractTitle(content),
-      content,
-      tags: Array.from(new Set([...extractedTags, ...suggested.slice(0, 2)])),
-      entryDate: today,
-      moodLevel: todayMood,
-    });
-
-    if (newEntry) {
-      setEntries((current) => [newEntry, ...current]);
-      setFilter("home");
+  const selectedHabitMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const item of habitCheckins) {
+      if (item.date === selectedDateOnly) {
+        map.set(item.habitKey, item.completed);
+      }
     }
-  };
+    return map;
+  }, [habitCheckins, selectedDateOnly]);
+
+  const calendarDays = useMemo(() => buildCalendarDays(selectedDate), [selectedDate]);
+
+  const onThisDayEntry = useMemo(() => {
+    const current = new Date(selectedDate);
+    const month = current.getMonth();
+    const day = current.getDate();
+    const year = current.getFullYear();
+
+    return entries
+      .filter((entry) => {
+        const date = new Date(entry.entryDate);
+        return date.getMonth() === month && date.getDate() === day && date.getFullYear() < year;
+      })
+      .sort((a, b) => b.entryDate.localeCompare(a.entryDate))[0] ?? null;
+  }, [entries, selectedDate]);
+
+  async function handleSaveSections() {
+    setIsSavingSections(true);
+    const content = serializeDiarySections(journalSections);
+    const title = extractTitle(journalSections.events || journalSections.reflection || "今天的日记");
+
+    try {
+      if (selectedPrimaryEntry) {
+        const updated = await updateNote({
+          ...selectedPrimaryEntry,
+          title,
+          content,
+          moodLevel: selectedMood,
+        });
+
+        if (updated) {
+          setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+        }
+      } else {
+        const created = await createNote({
+          title,
+          content,
+          tags: [],
+          entryDate: selectedDateOnly,
+          moodLevel: selectedMood,
+        });
+
+        if (created) {
+          setEntries((current) => [created, ...current]);
+        }
+      }
+    } finally {
+      setIsSavingSections(false);
+    }
+  }
 
   const handleSaveEdit = async (entryId: string, content: string) => {
     const current = entries.find((entry) => entry.id === entryId);
@@ -106,7 +199,6 @@ function AppContent() {
       ...current,
       title: extractTitle(content),
       content,
-      tags: extractTags(content),
     });
 
     if (updated) {
@@ -130,9 +222,8 @@ function AppContent() {
   };
 
   const handleMoodChange = async (level: MoodLevel) => {
-    if (todayEntries.length > 0) {
-      const target = todayEntries[0];
-      const updated = await updateNote({ ...target, moodLevel: level });
+    if (selectedPrimaryEntry) {
+      const updated = await updateNote({ ...selectedPrimaryEntry, moodLevel: level });
       if (updated) {
         setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
       }
@@ -141,9 +232,9 @@ function AppContent() {
 
     const created = await createNote({
       title: "今天的心情记录",
-      content: "今天先记录一下自己的心情，稍后再补完整的日记内容。",
+      content: serializeDiarySections(journalSections),
       tags: [],
-      entryDate: today,
+      entryDate: selectedDateOnly,
       moodLevel: level,
     });
 
@@ -153,30 +244,20 @@ function AppContent() {
   };
 
   const toggleHabit = async (habitKey: HabitCheckin["habitKey"]) => {
-    const current = habitCheckins.find((item) => item.date === today && item.habitKey === habitKey);
+    const current = habitCheckins.find((item) => item.date === selectedDateOnly && item.habitKey === habitKey);
     const next = await saveHabitCheckin({
-      date: today,
+      date: selectedDateOnly,
       habitKey,
       completed: !current?.completed,
     });
 
     if (next) {
       setHabitCheckins((existing) => {
-        const rest = existing.filter((item) => !(item.date === today && item.habitKey === habitKey));
+        const rest = existing.filter((item) => !(item.date === selectedDateOnly && item.habitKey === habitKey));
         return [...rest, next];
       });
     }
   };
-
-  const todayHabitMap = useMemo(() => {
-    const map = new Map<string, boolean>();
-    for (const item of habitCheckins) {
-      if (item.date === today) {
-        map.set(item.habitKey, item.completed);
-      }
-    }
-    return map;
-  }, [habitCheckins, today]);
 
   if (status === "loading" || !hydrated) {
     return <div className="min-h-screen flex items-center justify-center bg-paper">正在加载...</div>;
@@ -189,7 +270,6 @@ function AppContent() {
         open={Boolean(editingEntry)}
         onClose={() => setEditingEntry(null)}
         onSave={handleSaveEdit}
-        allKnownTags={Array.from(new Set(entries.flatMap((entry) => entry.tags)))}
       />
 
       <MobileSidebar
@@ -201,7 +281,7 @@ function AppContent() {
         notesCount={entries.length}
       />
 
-      <div className="mx-auto flex min-h-screen max-w-[1800px]">
+      <div className="mx-auto flex min-h-screen max-w-[1800px] gap-4 px-4 py-4 sm:px-6 sm:py-6">
         <Sidebar
           collapsed={collapsed}
           currentFilter={filter}
@@ -211,7 +291,7 @@ function AppContent() {
           notesCount={entries.length}
         />
 
-        <main className="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <main className="flex-1 space-y-6">
           <TopBar
             onOpenMenu={() => setMobileOpen(true)}
             noteCount={entries.length}
@@ -222,114 +302,322 @@ function AppContent() {
             onLogout={() => signOut({ callbackUrl: "/login" })}
           />
 
-          <div className="mt-6 space-y-6">
-            {filter !== "settings" && (
-              <section className="rounded-[2rem] border border-border/70 bg-card/85 p-5 shadow-soft">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full bg-accent/70 px-3 py-1 text-xs uppercase tracking-[0.22em] text-primary">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      Today
+          {(filter === "home" || filter === "today" || filter === "insights") && (
+            <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-10 shadow-soft">
+              <div className="text-center">
+                <h1 className="font-display text-6xl leading-none text-[#d29ac5] sm:text-7xl">Journal</h1>
+                <p className="mt-3 text-sm uppercase tracking-[0.38em] text-foreground/45">Daily Reflections</p>
+              </div>
+
+              <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.35fr_1fr]">
+                <section className="glass-card rounded-[1.9rem] border border-white/60 p-5 shadow-soft">
+                  <div className="flex items-center justify-between text-foreground/55">
+                    <p className="text-sm">Calendar</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                        className="rounded-full p-1 hover:bg-white/70"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                        className="rounded-full p-1 hover:bg-white/70"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
-                    <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground">{formatFullDate(new Date().toISOString())}</h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/60">
-                      先记录今天的心情，再完成习惯打卡，最后写下你今天最想记住的一件事。
-                    </p>
                   </div>
 
-                  <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-4 lg:w-[360px]">
-                    <div className="flex items-center gap-2 text-sm text-foreground/55">
-                      <Heart className="h-4 w-4" />
-                      今日心情
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                  <p className="mt-4 text-center font-medium text-foreground">
+                    {selectedDate.toLocaleString("en-US", { month: "short", year: "numeric" })}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-foreground/40">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
+                      <span key={day}>{day}</span>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-7 gap-2">
+                    {calendarDays.map((day) => {
+                      if (!day.date) {
+                        return <div key={day.key} className="h-9" />;
+                      }
+
+                      const hasEntry = entries.some((entry) => entry.entryDate === day.date);
+                      const isSelected = day.date === selectedDateOnly;
+                      const isToday = day.date === today;
+
+                      return (
+                        <button
+                          key={day.key}
+                          type="button"
+                          onClick={() => setSelectedDate(new Date(`${day.date}T12:00:00`))}
+                          className={`h-9 rounded-2xl text-sm transition ${
+                            isSelected
+                              ? "gradient-pill text-white"
+                              : hasEntry
+                                ? "bg-[#fdf0f6] text-[#a1698f] hover:bg-[#f7d8ea]"
+                                : "bg-white/45 text-foreground/55 hover:bg-white/70"
+                          } ${isToday && !isSelected ? "ring-1 ring-[#f1bed8]" : ""}`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(new Date())}
+                    className="gradient-pill mt-6 w-full rounded-full px-4 py-2 text-sm text-white shadow-soft"
+                  >
+                    Back to Today
+                  </button>
+                </section>
+
+                <section className="glass-card rounded-[1.9rem] border border-white/60 p-5 shadow-soft">
+                  <DataVisualization entries={entries} habits={habitCheckins} />
+                </section>
+
+                <section className="glass-card rounded-[1.9rem] border border-white/60 p-5 shadow-soft">
+                  <p className="text-sm text-foreground/55">On This Day Last Year</p>
+                  <div className="mt-4 rounded-[1.5rem] bg-white/55 p-4">
+                    {onThisDayEntry ? (
+                      <>
+                        <p className="text-sm text-foreground/45">{formatEntryDate(onThisDayEntry.entryDate)}</p>
+                        <h3 className="mt-2 text-lg font-medium text-foreground">{onThisDayEntry.title || "历史日记"}</h3>
+                        <p className="mt-3 text-sm leading-7 text-foreground/60">{extractPreview(onThisDayEntry.content)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-display text-2xl text-[#c995bd]">No memory</p>
+                        <p className="mt-3 text-sm text-foreground/50">去年的今天还没有留下记录，等明年回来看今天吧。</p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="mt-6 rounded-[1.5rem] bg-white/55 p-4">
+                    <p className="text-sm text-foreground/55">Today’s Mood</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {[1, 2, 3, 4, 5].map((level) => (
                         <button
                           key={level}
                           type="button"
                           onClick={() => void handleMoodChange(level as MoodLevel)}
-                          className={`rounded-2xl border px-4 py-3 text-sm transition ${
-                            todayMood === level
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/70 bg-card/70 text-foreground/70 hover:border-primary/20 hover:text-primary"
+                          className={`rounded-full px-3 py-2 text-sm transition ${
+                            selectedMood === level
+                              ? "gradient-pill text-white"
+                              : "bg-white/75 text-foreground/65 hover:bg-white"
                           }`}
                         >
-                          <span className="mr-2">{getMoodEmoji(level)}</span>
-                          {getMoodLabel(level)}
+                          {getMoodEmoji(level)} {getMoodLabel(level)}
                         </button>
                       ))}
                     </div>
                   </div>
+                </section>
+              </div>
+            </section>
+          )}
+
+          {filter !== "settings" && (
+            <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-10 shadow-soft">
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => setFilter("home")}
+                  className="text-sm text-foreground/55 transition hover:text-foreground"
+                >
+                  ← Back
+                </button>
+                <div className="text-center">
+                  <p className="font-display text-5xl leading-none text-foreground">{formatFullDate(selectedDate.toISOString())}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.32em] text-foreground/40">Daily Notes</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveSections()}
+                  disabled={isSavingSections}
+                  className="gradient-pill inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm text-white shadow-soft disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  {isSavingSections ? "Saving..." : "Save"}
+                </button>
+              </div>
 
-                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {HABIT_DEFINITIONS.map((habit) => {
-                    const completed = todayHabitMap.get(habit.key);
-                    return (
-                      <button
-                        key={habit.key}
-                        type="button"
-                        onClick={() => void toggleHabit(habit.key)}
-                        className={`rounded-[1.5rem] border p-4 text-left transition ${
-                          completed
-                            ? "border-primary/30 bg-primary/10"
-                            : "border-border/70 bg-background/70 hover:border-primary/20"
-                        }`}
-                      >
-                        <div className="text-2xl">{habit.icon}</div>
-                        <p className="mt-3 font-medium text-foreground">{habit.label}</p>
-                        <p className="mt-1 text-sm text-foreground/55">{completed ? "今天已完成" : "今天还没打卡"}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {(filter === "home" || filter === "today") && <InspirationInput onSubmit={(content) => void handleCreateEntry(content)} />}
-
-            {(filter === "home" || filter === "insights") && (
-              <DataVisualization entries={entries} habits={habitCheckins} />
-            )}
-
-            {filter === "settings" && (
-              <section>
-                <SettingsPanel notes={entries} onImportSuccess={(imported) => setEntries((current) => [...imported, ...current])} />
-              </section>
-            )}
-
-            {filter !== "settings" && (
-              <section>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">
-                      {filter === "today" ? "Today Diary" : filter === "all" ? "All Diaries" : "Recent Diaries"}
-                    </p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                      {filter === "today" ? "今日日记" : filter === "all" ? "全部日记" : "最近日记"}
-                    </h3>
+              <div className="mt-10 grid gap-4 lg:grid-cols-3">
+                <JournalCard
+                  icon={<NotebookPen className="h-5 w-5" />}
+                  title="Events"
+                  subtitle="Tap to write..."
+                  value={journalSections.events}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, events: value }))}
+                />
+                <JournalCard
+                  icon={<Heart className="h-5 w-5" />}
+                  title="Mood"
+                  subtitle="Rate your mood..."
+                  value={journalSections.moodNote}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, moodNote: value }))}
+                />
+                <JournalCard
+                  icon={<Sparkles className="h-5 w-5" />}
+                  title="Reflection"
+                  subtitle="Tap to write..."
+                  value={journalSections.reflection}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, reflection: value }))}
+                />
+                <JournalCard
+                  icon={<Sunrise className="h-5 w-5" />}
+                  title="Tomorrow"
+                  subtitle="Tap to write..."
+                  value={journalSections.tomorrow}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, tomorrow: value }))}
+                />
+                <JournalCard
+                  icon={<Camera className="h-5 w-5" />}
+                  title="Photos"
+                  subtitle="Add photos..."
+                  value={journalSections.photoNote}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, photoNote: value }))}
+                />
+                <JournalCard
+                  icon={<CircleDot className="h-5 w-5" />}
+                  title="Habits"
+                  subtitle={`${Array.from(selectedHabitMap.values()).filter(Boolean).length} / ${HABIT_DEFINITIONS.length} completed`}
+                  value={journalSections.habitsNote}
+                  onChange={(value) => setJournalSections((current: DiarySections) => ({ ...current, habitsNote: value }))}
+                >
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {HABIT_DEFINITIONS.map((habit) => {
+                      const completed = selectedHabitMap.get(habit.key);
+                      return (
+                        <button
+                          key={habit.key}
+                          type="button"
+                          onClick={() => void toggleHabit(habit.key)}
+                          className={`rounded-full px-3 py-2 text-xs transition ${
+                            completed ? "gradient-pill text-white" : "bg-white/70 text-foreground/65"
+                          }`}
+                        >
+                          {habit.icon} {habit.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-sm text-foreground/55">
-                    {searchQuery.trim() ? `当前搜索到 ${visibleEntries.length} 条结果` : "把每天的状态、感受和成长，慢慢记成自己的长期轨迹。"}
+                </JournalCard>
+              </div>
+            </section>
+          )}
+
+          {filter === "settings" && (
+            <section className="glass-card rounded-[2.2rem] border border-white/60 p-6 shadow-soft">
+              <SettingsPanel notes={entries} onImportSuccess={(imported) => setEntries((current) => [...imported, ...current])} />
+            </section>
+          )}
+
+          {filter !== "settings" && (
+            <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-8 shadow-soft">
+              <div className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.32em] text-foreground/40">
+                    {filter === "today" ? "Today Entries" : filter === "all" ? "All Entries" : "Recent Entries"}
                   </p>
+                  <h3 className="font-display mt-2 text-4xl text-foreground">
+                    {filter === "today" ? "Today" : filter === "all" ? "Archive" : "Recent"}
+                  </h3>
                 </div>
+                <p className="text-sm text-foreground/55">
+                  {searchQuery.trim() ? `找到 ${visibleEntries.length} 条结果` : "保留那些值得你回头再看的日子。"}
+                </p>
+              </div>
 
-                {visibleEntries.length > 0 ? (
-                  <div className="columns-1 gap-4 space-y-4 md:columns-2 xl:columns-3">
-                    {visibleEntries.map((entry) => (
-                      <NoteCard key={entry.id} note={entry} onEdit={setEditingEntry} onDelete={handleDeleteEntry} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState />
-                )}
-              </section>
-            )}
-          </div>
+              {visibleEntries.length > 0 ? (
+                <div className="columns-1 gap-4 space-y-4 md:columns-2 xl:columns-3">
+                  {visibleEntries.map((entry) => (
+                    <NoteCard key={entry.id} note={entry} onEdit={setEditingEntry} onDelete={handleDeleteEntry} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState />
+              )}
+            </section>
+          )}
         </main>
       </div>
     </div>
   );
+}
+
+function JournalCard({
+  icon,
+  title,
+  subtitle,
+  value,
+  onChange,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  value: string;
+  onChange: (value: string) => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="glass-card min-h-[220px] rounded-[1.8rem] border border-white/60 p-5 shadow-soft">
+      <div className="flex h-full flex-col">
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffd5c8] to-[#efc4ff] text-[#8d6282]">
+          {icon}
+        </div>
+        <h4 className="mt-4 text-lg font-medium text-foreground">{title}</h4>
+        <p className="mt-1 text-sm text-foreground/45">{subtitle}</p>
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="mt-4 min-h-[80px] flex-1 resize-none bg-transparent text-sm leading-7 text-foreground outline-none placeholder:text-foreground/28"
+          placeholder="Tap to write..."
+        />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function buildCalendarDays(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const days: Array<{ key: string; date?: string; label?: number }> = [];
+
+  for (let i = 0; i < firstDay.getDay(); i += 1) {
+    days.push({ key: `empty-${i}` });
+  }
+
+  for (let day = 1; day <= lastDay.getDate(); day += 1) {
+    const current = new Date(year, month, day);
+    days.push({
+      key: toDateOnly(current),
+      date: toDateOnly(current),
+      label: day,
+    });
+  }
+
+  while (days.length % 7 !== 0) {
+    days.push({ key: `tail-${days.length}` });
+  }
+
+  return days;
+}
+
+function extractPreview(content: string) {
+  const sections = parseDiarySections(content);
+  return [sections.events, sections.reflection, sections.moodNote].filter(Boolean).join(" ").slice(0, 140) || "这一天有些内容被留在了这里。";
 }
 
 export function AppShell() {

@@ -3,26 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --background: 244 242 236;
-  --foreground: 26 28 32;
-  --border: 208 214 222;
-  --card: 255 255 253;
-  --muted: 243 239 230;
-  --accent: 227 236 227;
-  --primary: 48 89 72;
-  --success: 85 133 102;
+  --background: 251 243 238;
+  --foreground: 79 63 76;
+  --border: 240 220 225;
+  --card: 255 251 250;
+  --muted: 250 239 243;
+  --accent: 255 233 224;
+  --primary: 224 138 198;
+  --success: 250 207 144;
   --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Snell Roundhand", "Apple Chancery", "URW Chancery L", "Georgia", serif;
 }
 
 .dark {
-  --background: 17 19 24;
-  --foreground: 235 237 241;
-  --border: 56 63 74;
-  --card: 25 28 34;
-  --muted: 31 35 42;
-  --accent: 37 48 44;
-  --primary: 168 211 187;
-  --success: 135 196 158;
+  --background: 35 24 34;
+  --foreground: 245 235 239;
+  --border: 102 76 92;
+  --card: 54 38 50;
+  --muted: 67 48 60;
+  --accent: 86 62 73;
+  --primary: 244 173 223;
+  --success: 250 219 170;
 }
 
 html {
@@ -32,10 +33,13 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(168, 211, 187, 0.15), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(167, 184, 214, 0.1), transparent 24%),
+    radial-gradient(circle at top left, rgba(255, 201, 172, 0.52), transparent 28%),
+    radial-gradient(circle at top right, rgba(242, 181, 213, 0.42), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(255, 226, 194, 0.38), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(213, 183, 247, 0.28), transparent 25%),
     rgb(var(--background));
   color: rgb(var(--foreground));
+  font-family: var(--font-sans);
 }
 
 * {
@@ -43,7 +47,7 @@ body {
 }
 
 ::selection {
-  background: rgba(48, 89, 72, 0.2);
+  background: rgba(224, 138, 198, 0.24);
 }
 
 .scrollbar-thin {
@@ -55,8 +59,21 @@ body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: rgba(224, 138, 198, 0.28);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.glass-card {
+  background: rgba(255, 251, 250, 0.68);
+  backdrop-filter: blur(18px);
+}
+
+.gradient-pill {
+  background: linear-gradient(90deg, rgba(255, 186, 198, 1) 0%, rgba(224, 160, 236, 1) 100%);
 }
