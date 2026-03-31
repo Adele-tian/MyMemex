@@ -14,6 +14,8 @@ type AuthJwt = {
   token: JWT;
   user?: {
     id: string;
+    name?: string | null;
+    email?: string | null;
   };
 };
 
@@ -57,6 +59,8 @@ export const authOptions: AuthOptions = {
     async session({ session, token }: AuthSession) {
       if (session.user && token.sub) {
         (session.user as typeof session.user & { id: string }).id = token.sub;
+        session.user.name = typeof token.name === "string" ? token.name : session.user.name;
+        session.user.email = typeof token.email === "string" ? token.email : session.user.email;
       }
 
       return session;
@@ -64,6 +68,14 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }: AuthJwt) {
       if (user?.id) {
         token.sub = user.id;
+      }
+
+       if (user?.name) {
+        token.name = user.name;
+      }
+
+      if (user?.email) {
+        token.email = user.email;
       }
 
       return token;

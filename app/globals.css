@@ -16,14 +16,14 @@
 }
 
 .dark {
-  --background: 35 24 34;
-  --foreground: 245 235 239;
-  --border: 102 76 92;
-  --card: 54 38 50;
-  --muted: 67 48 60;
-  --accent: 86 62 73;
-  --primary: 244 173 223;
-  --success: 250 219 170;
+  --background: 28 21 31;
+  --foreground: 252 244 248;
+  --border: 146 116 135;
+  --card: 72 54 68;
+  --muted: 95 73 88;
+  --accent: 115 84 104;
+  --primary: 245 181 226;
+  --success: 252 223 176;
 }
 
 html {
@@ -40,6 +40,15 @@ body {
     rgb(var(--background));
   color: rgb(var(--foreground));
   font-family: var(--font-sans);
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(163, 98, 83, 0.28), transparent 28%),
+    radial-gradient(circle at top right, rgba(168, 92, 136, 0.24), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(145, 103, 74, 0.2), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(118, 92, 164, 0.2), transparent 25%),
+    rgb(var(--background));
 }
 
 * {
@@ -72,6 +81,45 @@ body {
 .glass-card {
   background: rgba(255, 251, 250, 0.68);
   backdrop-filter: blur(18px);
+}
+
+.dark .glass-card {
+  background: rgba(74, 56, 70, 0.82);
+}
+
+.dark .bg-white\/45 {
+  background: rgba(90, 70, 86, 0.78);
+}
+
+.dark .bg-white\/55,
+.dark .bg-white\/60 {
+  background: rgba(100, 78, 95, 0.82);
+}
+
+.dark .bg-white\/75 {
+  background: rgba(118, 94, 111, 0.86);
+}
+
+.dark textarea::placeholder,
+.dark input::placeholder {
+  color: rgba(252, 244, 248, 0.56);
+}
+
+.dark .text-foreground\/40 {
+  color: rgba(252, 244, 248, 0.68);
+}
+
+.dark .text-foreground\/45 {
+  color: rgba(252, 244, 248, 0.72);
+}
+
+.dark .text-foreground\/50 {
+  color: rgba(252, 244, 248, 0.76);
+}
+
+.dark .text-foreground\/55,
+.dark .text-foreground\/60 {
+  color: rgba(252, 244, 248, 0.82);
 }
 
 .gradient-pill {

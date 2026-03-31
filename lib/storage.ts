@@ -31,30 +31,43 @@ function normalizeNote(note: any): Note {
   };
 }
 
+type LoadNotesOptions = {
+  allowSampleData?: boolean;
+};
+
 // 当应用处于服务器端或未登录状态下，返回示例数据
-export async function loadNotes(): Promise<Note[]> {
+export async function loadNotes(options: LoadNotesOptions = {}): Promise<Note[]> {
+  const { allowSampleData = true } = options;
+
   if (typeof window === "undefined") {
-    return sampleNotes;
+    return allowSampleData ? sampleNotes : [];
   }
 
   try {
-    // 尝试从API获取用户笔记
     const response = await fetchWithTimeout('/api/notes');
 
     if (!response.ok) {
-      // 如果用户未登录或出现错误，返回示例数据
       if (response.status === 401) {
-        // 用户未登录，提示需要登录
-        console.warn('用户未登录，显示示例数据。请先登录以访问您的笔记。');
+        if (allowSampleData) {
+          console.warn('用户未登录，显示示例数据。请先登录以访问您的笔记。');
+          return sampleNotes;
+        }
+
+        return [];
       }
-      return sampleNotes;
+
+      throw new Error(`加载笔记失败: ${response.statusText}`);
     }
 
     const notes = await response.json();
     return notes.map(normalizeNote);
   } catch (error) {
     console.error('加载笔记时发生错误:', error);
-    return sampleNotes;
+    if (allowSampleData) {
+      return sampleNotes;
+    }
+
+    throw error;
   }
 }
 
