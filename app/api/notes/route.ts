@@ -1,31 +1,19 @@
 import { NextRequest } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth-options';
-import prisma from '@/lib/prisma';
+import { createNote, listNotes } from '@/lib/insforge-db';
+import { getServerAuthContext } from '@/lib/server-auth';
 
 // 获取当前用户的笔记
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user.id;
+    const notes = await listNotes(auth);
 
-    const notes = await prisma.note.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    const notesWithTagsArray = notes.map(note => ({
-      ...note,
-      entryDate: note.entryDate.toISOString(),
-      tags: note.tags ? note.tags.split(',').filter(tag => tag.trim()) : []
-    }));
-
-    return new Response(JSON.stringify(notesWithTagsArray), {
+    return new Response(JSON.stringify(notes), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -38,30 +26,23 @@ export async function GET(request: NextRequest) {
 // 创建新笔记
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user.id;
     const { title, content, tags, entryDate, moodLevel } = await request.json();
 
-    const newNote = await prisma.note.create({
-      data: {
-        title,
-        content,
-        tags: Array.isArray(tags) ? tags.join(',') : (tags || ''),
-        entryDate: entryDate ? new Date(`${entryDate}T00:00:00.000Z`) : new Date(),
-        moodLevel: typeof moodLevel === "number" ? moodLevel : null,
-        userId,
-      },
+    const newNote = await createNote(auth, {
+      title,
+      content,
+      tags: Array.isArray(tags) ? tags : [],
+      entryDate: entryDate || new Date().toISOString().slice(0, 10),
+      moodLevel: typeof moodLevel === "number" ? moodLevel : null,
     });
 
-    return new Response(JSON.stringify({
-      ...newNote,
-      entryDate: newNote.entryDate.toISOString(),
-    }), {
+    return new Response(JSON.stringify(newNote), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     });

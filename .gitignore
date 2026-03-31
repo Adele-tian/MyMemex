@@ -7,5 +7,24 @@ yarn-error.log*
 pnpm-debug.log*
 jupyter_env
 *.tsbuildinfo
+.env.production
+.vercel
 
 /lib/generated/prisma
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+skills
+skills-lock.json
+.trae
+.windsurf

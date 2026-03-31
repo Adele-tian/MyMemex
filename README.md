@@ -10,6 +10,22 @@ Always start the app from `/Users/admin/Knowlegde_Per_Assis/MyMemex`.
 npm run dev
 ```
 
+Before starting, make sure `.env` contains:
+
+```bash
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=http://localhost:3000
+INSFORGE_BASE_URL=https://your-app.region.insforge.app
+INSFORGE_ANON_KEY=your-insforge-anon-key
+```
+
+Production deploys in this workspace use [.env.production](/Users/admin/Knowlegde_Per_Assis/MyMemex/.env.production) with the default Vercel domain `https://my-memex.vercel.app`.
+Mirror the same values into the Vercel project's Production environment variables before the first live release.
+
+Before first run, create the InsForge tables with [insforge/schema.sql](/Users/admin/Knowlegde_Per_Assis/MyMemex/insforge/schema.sql).
+
+If you are using the InsForge SQL tool, run the whole file once, then start the app.
+
 If `3000` is occupied, Next.js will automatically choose the next free port.
 
 ### If you see `Cannot find module './xxx.js'`

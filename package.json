@@ -2,10 +2,11 @@
   "name": "second-brain",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "clean": "rm -rf .next",
-    "postinstall": "prisma generate",
-    "prebuild": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -13,15 +14,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/adapter-libsql": "^7.5.0",
-    "@prisma/client": "^7.5.0",
+    "@insforge/sdk": "^1.2.2",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
     "lucide-react": "^0.511.0",
     "next": "14.2.30",
     "next-auth": "^4.24.13",
-    "prisma": "^7.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

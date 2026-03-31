@@ -1,9 +1,7 @@
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { AuthOptions, DefaultSession } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import prisma from "@/lib/prisma";
+import { createInsforgeServerClient } from "@/lib/insforge";
 
 type AuthSession = {
   session: DefaultSession;
@@ -16,11 +14,11 @@ type AuthJwt = {
     id: string;
     name?: string | null;
     email?: string | null;
+    insforgeAccessToken?: string;
   };
 };
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -33,24 +31,21 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+        const client = createInsforgeServerClient();
+        const { data, error } = await client.auth.signInWithPassword({
+          email: credentials.email,
+          password: credentials.password,
         });
 
-        if (!user?.password) {
-          return null;
-        }
-
-        const isValidPassword = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isValidPassword) {
+        if (error || !data?.user || !data.accessToken) {
           return null;
         }
 
         return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: data.user.id,
+          email: data.user.email,
+          name: typeof data.user.profile?.name === "string" ? data.user.profile.name : null,
+          insforgeAccessToken: data.accessToken,
         };
       },
     }),
@@ -70,12 +65,16 @@ export const authOptions: AuthOptions = {
         token.sub = user.id;
       }
 
-       if (user?.name) {
+      if (user?.name) {
         token.name = user.name;
       }
 
       if (user?.email) {
         token.email = user.email;
+      }
+
+      if (user?.insforgeAccessToken) {
+        token.insforgeAccessToken = user.insforgeAccessToken;
       }
 
       return token;

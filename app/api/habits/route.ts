@@ -1,20 +1,16 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-options";
-import prisma from "@/lib/prisma";
+import { listHabitCheckins, upsertHabitCheckin } from "@/lib/insforge-db";
+import { getServerAuthContext } from "@/lib/server-auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const checkins = await prisma.habitCheckin.findMany({
-      where: { userId: session.user.id },
-      orderBy: [{ date: "desc" }, { habitKey: "asc" }],
-    });
+    const checkins = await listHabitCheckins(auth);
 
     return new Response(JSON.stringify(checkins), {
       status: 200,
@@ -28,9 +24,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -40,26 +36,10 @@ export async function POST(request: NextRequest) {
       return new Response("Bad Request", { status: 400 });
     }
 
-    const normalizedDate = new Date(`${date}T00:00:00.000Z`);
-
-    const record = await prisma.habitCheckin.upsert({
-      where: {
-        userId_date_habitKey: {
-          userId: session.user.id,
-          date: normalizedDate,
-          habitKey,
-        },
-      },
-      update: {
-        completed: Boolean(completed),
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: session.user.id,
-        date: normalizedDate,
-        habitKey,
-        completed: Boolean(completed),
-      },
+    const record = await upsertHabitCheckin(auth, {
+      date,
+      habitKey,
+      completed: Boolean(completed),
     });
 
     return new Response(JSON.stringify(record), {

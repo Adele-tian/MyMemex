@@ -1,51 +1,27 @@
 import { NextRequest } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth-options';
-import prisma from '@/lib/prisma';
+import { deleteNote, updateNote } from '@/lib/insforge-db';
+import { getServerAuthContext } from '@/lib/server-auth';
 
 // 更新笔记
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user.id;
     const { id, title, content, tags, entryDate, moodLevel } = await request.json();
 
-    // 确保用户只能更新自己的笔记
-    const existingNote = await prisma.note.findFirst({
-      where: {
-        id,
-        userId,
-      },
+    const updatedNote = await updateNote(auth, id, {
+      title,
+      content,
+      tags: Array.isArray(tags) ? tags : [],
+      entryDate,
+      moodLevel: typeof moodLevel === "number" ? moodLevel : null,
     });
 
-    if (!existingNote) {
-      return new Response('Note not found or unauthorized', { status: 404 });
-    }
-
-    const updatedNote = await prisma.note.update({
-      where: { id },
-      data: {
-        title,
-        content,
-        tags: Array.isArray(tags) ? tags.join(',') : (tags || ''),
-        entryDate: entryDate ? new Date(`${entryDate}T00:00:00.000Z`) : existingNote.entryDate,
-        moodLevel: typeof moodLevel === "number" ? moodLevel : null,
-        updatedAt: new Date(),
-      },
-    });
-
-    const noteWithTagsArray = {
-      ...updatedNote,
-      entryDate: updatedNote.entryDate.toISOString(),
-      tags: updatedNote.tags ? updatedNote.tags.split(',').filter(tag => tag.trim()) : []
-    };
-
-    return new Response(JSON.stringify(noteWithTagsArray), {
+    return new Response(JSON.stringify(updatedNote), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -58,30 +34,14 @@ export async function PUT(request: NextRequest) {
 // 删除笔记
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await getServerAuthContext(request);
 
-    if (!session) {
+    if (!auth) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const userId = session.user.id;
-    const { id } = await request.json(); // 从请求体中获取笔记ID
-
-    // 确保用户只能删除自己的笔记
-    const existingNote = await prisma.note.findFirst({
-      where: {
-        id,
-        userId,
-      },
-    });
-
-    if (!existingNote) {
-      return new Response('Note not found or unauthorized', { status: 404 });
-    }
-
-    await prisma.note.delete({
-      where: { id },
-    });
+    const { id } = await request.json();
+    await deleteNote(auth, id);
 
     return new Response('Note deleted successfully', {
       status: 200,
