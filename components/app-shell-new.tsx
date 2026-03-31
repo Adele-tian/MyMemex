@@ -176,8 +176,6 @@ function AppContent() {
       scoped = [...entries];
     } else if (filter === "home") {
       scoped = [...entries].slice(0, 9);
-    } else if (filter === "insights") {
-      scoped = [...entries].slice(0, 12);
     } else {
       scoped = [];
     }
@@ -461,43 +459,37 @@ function AppContent() {
               </div>
 
               <div className="mt-8 space-y-4">
-                <div className="rounded-[1.5rem] border border-white/55 bg-white/45 px-4 py-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Today&apos;s Mood</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => void handleMoodChange(level as MoodLevel)}
-                        className={`rounded-full px-3 py-2 text-sm transition ${
-                          selectedMood === level ? "gradient-pill text-white" : "bg-white/75 text-foreground/65 hover:bg-white"
-                        }`}
-                      >
-                        {getMoodEmoji(level)} {getMoodLabel(level)}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => void handleMoodChange(level as MoodLevel)}
+                      className={`rounded-full px-3 py-1.5 text-sm transition ${
+                        selectedMood === level ? "gradient-pill text-white" : "bg-white/75 text-foreground/65 hover:bg-white"
+                      }`}
+                    >
+                      {getMoodEmoji(level)} {getMoodLabel(level)}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="rounded-[1.5rem] border border-white/55 bg-white/45 px-4 py-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-foreground/45">Today&apos;s Habits</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {HABIT_DEFINITIONS.map((habit) => {
-                      const completed = selectedHabitMap.get(habit.key);
-                      return (
-                        <button
-                          key={habit.key}
-                          type="button"
-                          onClick={() => void toggleHabit(habit.key)}
-                          className={`rounded-full px-3 py-2 text-xs transition ${
-                            completed ? "gradient-pill text-white" : "bg-white/75 text-foreground/65 hover:bg-white"
-                          }`}
-                        >
-                          {habit.icon} {habit.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {HABIT_DEFINITIONS.map((habit) => {
+                    const completed = selectedHabitMap.get(habit.key);
+                    return (
+                      <button
+                        key={habit.key}
+                        type="button"
+                        onClick={() => void toggleHabit(habit.key)}
+                        className={`rounded-full px-3 py-1.5 text-xs transition ${
+                          completed ? "gradient-pill text-white" : "bg-white/75 text-foreground/65 hover:bg-white"
+                        }`}
+                      >
+                        {habit.icon} {habit.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -513,67 +505,7 @@ function AppContent() {
           )}
 
           {filter === "home" && (
-            <section className="grid gap-6 xl:grid-cols-[1.7fr_0.9fr]">
-              <div>
-                <DataVisualization entries={entries} habits={habitCheckins} />
-              </div>
-
-              <section className="glass-card rounded-[2rem] border border-white/60 p-5 shadow-soft">
-                <div className="rounded-[1.5rem] bg-white/55 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-foreground/55">Date</p>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate(new Date())}
-                      className="gradient-pill rounded-full px-3 py-1 text-xs text-white"
-                    >
-                      今天
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate((current) => shiftDate(current, -1))}
-                      className="rounded-full p-1.5 text-foreground/60 transition hover:bg-white/70"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <p className="text-center text-sm font-medium text-foreground">{formatEntryDate(selectedDate.toISOString())}</p>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate((current) => shiftDate(current, 1))}
-                      className="rounded-full p-1.5 text-foreground/60 transition hover:bg-white/70"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-[1.5rem] bg-white/55 p-4">
-                  <p className="text-sm text-foreground/55">On This Day Last Year</p>
-                  {onThisDayEntry ? (
-                    <>
-                      <h3 className="mt-3 text-lg font-medium text-foreground">{onThisDayEntry.title || "历史日记"}</h3>
-                      <p className="mt-3 text-sm leading-7 text-foreground/60">{extractPreview(onThisDayEntry.content)}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-3 font-display text-2xl text-[#c995bd]">No memory</p>
-                      <p className="mt-2 text-sm text-foreground/50">去年的今天还没有留下记录，等明年回来看今天吧。</p>
-                    </>
-                  )}
-                </div>
-
-              </section>
-            </section>
-          )}
-
-          {filter === "insights" && (
-            <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-8 shadow-soft">
-              <div className="mb-6">
-                <p className="text-xs uppercase tracking-[0.32em] text-foreground/40">Trends</p>
-                <h2 className="font-display mt-2 text-4xl text-foreground">回顾趋势</h2>
-              </div>
+            <section className="glass-card rounded-[2.4rem] border border-white/60 px-10 py-10 shadow-soft">
               <DataVisualization entries={entries} habits={habitCheckins} />
             </section>
           )}
@@ -584,7 +516,7 @@ function AppContent() {
             </section>
           )}
 
-          {(filter === "all" || filter === "home" || filter === "insights" || searchQuery.trim()) && filter !== "settings" && (
+          {(filter === "all" || filter === "home" || searchQuery.trim()) && filter !== "settings" && (
             <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-8 shadow-soft">
               <div className="mb-5 flex items-end justify-between gap-4">
                 <div>

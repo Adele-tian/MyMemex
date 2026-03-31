@@ -45,12 +45,12 @@ export function DataVisualization({ entries, habits }: DataVisualizationProps) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.05fr_1fr]">
-      <section className="glass-card rounded-[2rem] border border-white/60 p-6 shadow-soft">
+    <div className="grid gap-8 xl:grid-cols-2">
+      <section className="glass-card rounded-[2.2rem] border border-white/60 p-8 shadow-soft">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-foreground/45">Mood Trends</p>
-            <h3 className="mt-2 text-xl font-semibold text-foreground">最近情绪周期</h3>
+            <h3 className="mt-3 text-2xl font-semibold text-foreground">最近情绪周期</h3>
           </div>
           <div className="flex gap-2 text-xs">
             <span className="rounded-full bg-[#f9d2e7] px-3 py-1 text-[#9a628a]">7 Days</span>
@@ -58,12 +58,12 @@ export function DataVisualization({ entries, habits }: DataVisualizationProps) {
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-7 gap-3">
+        <div className="mt-10 grid grid-cols-7 gap-4">
           {dailyMoodSeries.map((item) => {
             const height = item.level ? `${28 + item.level * 12}px` : "20px";
             return (
               <div key={item.date} className="flex flex-col items-center gap-2">
-                <div className="flex h-36 items-end">
+                <div className="flex h-40 items-end">
                   <div
                     className={`w-8 rounded-t-2xl transition ${
                       item.level ? "bg-gradient-to-b from-[#f7bfd6] to-[#ca94ff]" : "bg-white/65"
@@ -82,11 +82,11 @@ export function DataVisualization({ entries, habits }: DataVisualizationProps) {
         </div>
       </section>
 
-      <section className="glass-card rounded-[2rem] border border-white/60 p-6 shadow-soft">
+      <section className="glass-card rounded-[2.2rem] border border-white/60 p-8 shadow-soft">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-foreground/45">Habit Heatmap</p>
-            <h3 className="mt-2 text-xl font-semibold text-foreground">最近习惯打卡</h3>
+            <h3 className="mt-3 text-2xl font-semibold text-foreground">最近习惯打卡</h3>
           </div>
           <div className="flex gap-2 text-xs">
             <span className="rounded-full bg-[#f9d2e7] px-3 py-1 text-[#9a628a]">4 Weeks</span>
@@ -94,7 +94,7 @@ export function DataVisualization({ entries, habits }: DataVisualizationProps) {
           </div>
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-8 space-y-5">
           {HABIT_DEFINITIONS.map((habit) => (
             <div key={habit.key}>
               <div className="mb-2 flex items-center justify-between">

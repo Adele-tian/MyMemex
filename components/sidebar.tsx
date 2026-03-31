@@ -1,6 +1,6 @@
 "use client";
 
-import { BookHeart, CalendarDays, ChartSpline, NotebookPen, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
+import { BookHeart, CalendarDays, NotebookPen, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 import { ViewFilter } from "@/lib/types";
 
 interface SidebarProps {
@@ -57,7 +57,7 @@ export function Sidebar({
             active={currentFilter === "home"}
             icon={<BookHeart className="h-4 w-4" />}
             label="首页总览"
-            meta="情绪、习惯与回顾"
+            meta="情绪与习惯"
             onClick={() => onSelectFilter("home")}
           />
 
@@ -68,15 +68,6 @@ export function Sidebar({
             label="全部日记"
             meta={`${notesCount} 条`}
             onClick={() => onSelectFilter("all")}
-          />
-
-          <NavButton
-            collapsed={collapsed}
-            active={currentFilter === "insights"}
-            icon={<ChartSpline className="h-4 w-4" />}
-            label="回顾趋势"
-            meta="情绪与习惯"
-            onClick={() => onSelectFilter("insights")}
           />
 
           <NavButton

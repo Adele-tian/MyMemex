@@ -1,4 +1,4 @@
-export type ViewFilter = "home" | "today" | "all" | "insights" | "settings";
+export type ViewFilter = "home" | "today" | "all" | "settings";
 
 export interface SavedSearch {
   id: string;
