@@ -32,18 +32,7 @@ export function toDateOnly(date: string | Date) {
 }
 
 export function summarize(content: string, maxLength = 140) {
-  const structured = parseDiarySections(content);
-  const structuredText = [
-    structured.events,
-    structured.moodNote,
-    structured.reflection,
-    structured.tomorrow,
-    structured.photoNote,
-    structured.habitsNote,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
+  const structuredText = diaryContentToPlainText(content);
   const sourceText = structuredText || content;
   const plainText = content
     .replace(/^@@JOURNAL_V1@@/g, "")
@@ -160,6 +149,28 @@ export function serializeDiarySections(sections: DiarySections) {
 
 export function hasStructuredDiaryContent(content: string) {
   return content.startsWith(JOURNAL_PREFIX);
+}
+
+export function diarySectionsToPlainText(sections: DiarySections) {
+  return [
+    sections.events,
+    sections.moodNote,
+    sections.reflection,
+    sections.tomorrow,
+    sections.photoNote,
+    sections.habitsNote,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+export function diaryContentToPlainText(content: string) {
+  if (!hasStructuredDiaryContent(content)) {
+    return content.trim();
+  }
+
+  return diarySectionsToPlainText(parseDiarySections(content));
 }
 
 export function extractTags(input: string) {

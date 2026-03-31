@@ -29,11 +29,7 @@ export function Sidebar({
       } ${collapsed ? "w-24" : "w-80"} flex-col transition-all duration-300`}
     >
       <div className="border-b border-white/45 px-4 py-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className={collapsed ? "hidden" : "block flex-1"}>
-            <p className="text-xs uppercase tracking-[0.32em] text-foreground/45">Soft Archive</p>
-            <h1 className="font-display mt-2 text-3xl leading-none text-foreground">Journal</h1>
-          </div>
+        <div className="flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onToggle}
@@ -49,20 +45,20 @@ export function Sidebar({
         <div className="rounded-3xl border border-white/55 bg-white/45 p-2 shadow-soft">
           <NavButton
             collapsed={collapsed}
-            active={currentFilter === "home"}
-            icon={<BookHeart className="h-4 w-4" />}
-            label="首页"
-            meta="日期、情绪、习惯总览"
-            onClick={() => onSelectFilter("home")}
-          />
-
-          <NavButton
-            collapsed={collapsed}
             active={currentFilter === "today"}
             icon={<NotebookPen className="h-4 w-4" />}
             label="今日日记"
             meta="专注记录今天"
             onClick={() => onSelectFilter("today")}
+          />
+
+          <NavButton
+            collapsed={collapsed}
+            active={currentFilter === "home"}
+            icon={<BookHeart className="h-4 w-4" />}
+            label="首页总览"
+            meta="情绪、习惯与回顾"
+            onClick={() => onSelectFilter("home")}
           />
 
           <NavButton

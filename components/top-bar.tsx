@@ -37,16 +37,12 @@ export function TopBar({
           >
             <Menu className="h-4 w-4" />
           </button>
-          <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-foreground/45">Daily Reflections</p>
-            <h2 className="font-display text-3xl leading-none tracking-tight text-foreground">Journal</h2>
+          <div className="hidden rounded-full bg-white/65 px-3 py-1.5 text-sm text-foreground/60 sm:block">
+            {noteCount} 条日记
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden rounded-full bg-white/65 px-3 py-1.5 text-sm text-foreground/60 sm:block">
-            {noteCount} 条日记
-          </div>
           <div className="hidden rounded-full border border-white/55 bg-white/55 px-3 py-1.5 text-sm text-foreground/60 lg:block">
             {userName}
           </div>
