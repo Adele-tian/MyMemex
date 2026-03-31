@@ -57,6 +57,12 @@ export default function RegisterPage() {
         return;
       }
 
+      if (data.requireEmailVerification) {
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+        router.refresh();
+        return;
+      }
+
       const res = await signIn('credentials', {
         redirect: false,
         email,

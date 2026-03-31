@@ -35,7 +35,7 @@ async function tryMigrateLegacyAccount(email: string, password: string) {
 
 function getReadableError(error: string) {
   if (error === 'CredentialsSignin') {
-    return '邮箱或密码不正确。如果这是你旧版本的账号，我已经尝试自动迁移；如果还是不行，可能旧账号数据已经不在当前浏览器里了。';
+    return '邮箱或密码不正确；如果你是刚注册的新账号，请先完成邮箱验证码验证，再回来登录。';
   }
 
   return error;

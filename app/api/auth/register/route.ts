@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
 
     return new Response(
       JSON.stringify({
-        message: '用户注册成功',
+        message: user.requireEmailVerification ? '验证码已发送，请先完成邮箱验证' : '用户注册成功',
+        requireEmailVerification: user.requireEmailVerification,
         user: { id: user.id, email: user.email, name: user.name }
       }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
