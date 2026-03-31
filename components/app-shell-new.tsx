@@ -25,6 +25,26 @@ import {
 } from "@/lib/utils";
 
 function AppContent() {
+  const writingEncouragements = useMemo(
+    () => [
+      "写一点点也很好，今天的感受值得被认真放下。",
+      "不用组织得很完美，先把今天真实的你写下来。",
+      "哪怕只记一句话，也是在替今天留下一盏灯。",
+      "从此刻开始写，今天就已经被你好好接住了。",
+      "把脑海里的声音放进文字里，今天会轻一点。",
+    ],
+    [],
+  );
+  const saveCelebrations = useMemo(
+    () => [
+      "今天也认真记录下来了，真好。",
+      "这一页已经保存好，你又陪自己走了一步。",
+      "你刚刚为今天留下了痕迹，继续慢慢来就好。",
+      "今天的心情已经被好好接住了。",
+      "保存完成，愿你回头看时会感谢现在的自己。",
+    ],
+    [],
+  );
   const { data: session, status } = useSession();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [habitCheckins, setHabitCheckins] = useState<HabitCheckin[]>([]);
@@ -37,27 +57,48 @@ function AppContent() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [journalText, setJournalText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [writingPrompt, setWritingPrompt] = useState("");
+  const [topMessage, setTopMessage] = useState<string | null>(null);
 
   const today = toDateOnly(new Date());
   const selectedDateOnly = toDateOnly(selectedDate);
 
   useEffect(() => {
     async function fetchData() {
-      if (status !== "authenticated") {
-        setEntries(await loadNotes());
-        setHabitCheckins([]);
-        setHydrated(true);
-        return;
-      }
+      try {
+        if (status !== "authenticated") {
+          const loadedEntries = await loadNotes();
+          setEntries(loadedEntries);
+          setHabitCheckins([]);
+          return;
+        }
 
-      const [loadedEntries, loadedCheckins] = await Promise.all([loadNotes(), loadHabitCheckins()]);
-      setEntries(loadedEntries);
-      setHabitCheckins(loadedCheckins);
-      setHydrated(true);
+        const [loadedEntries, loadedCheckins] = await Promise.allSettled([loadNotes(), loadHabitCheckins()]);
+
+        setEntries(loadedEntries.status === "fulfilled" ? loadedEntries.value : []);
+        setHabitCheckins(loadedCheckins.status === "fulfilled" ? loadedCheckins.value : []);
+      } finally {
+        setHydrated(true);
+      }
     }
 
     void fetchData();
   }, [status]);
+
+  useEffect(() => {
+    if (filter === "today") {
+      setWritingPrompt(randomItem(writingEncouragements));
+    }
+  }, [filter, selectedDateOnly, writingEncouragements]);
+
+  useEffect(() => {
+    if (!topMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setTopMessage(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [topMessage]);
 
   const selectedDateEntries = useMemo(
     () => entries.filter((entry) => entry.entryDate === selectedDateOnly).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -147,6 +188,8 @@ function AppContent() {
     const title = extractTitle(content || "今天的日记");
 
     try {
+      let savedSuccessfully = false;
+
       if (selectedPrimaryEntry) {
         const updated = await updateNote({
           ...selectedPrimaryEntry,
@@ -157,6 +200,7 @@ function AppContent() {
 
         if (updated) {
           setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+          savedSuccessfully = true;
         }
       } else {
         const created = await createNote({
@@ -169,8 +213,18 @@ function AppContent() {
 
         if (created) {
           setEntries((current) => [created, ...current]);
+          savedSuccessfully = true;
         }
       }
+
+      if (savedSuccessfully) {
+        setTopMessage(randomItem(saveCelebrations));
+        setFilter("home");
+      } else {
+        setTopMessage("这次保存没有成功，别着急，我们再试一次。");
+      }
+    } catch {
+      setTopMessage("这次保存没有成功，别着急，我们再试一次。");
     } finally {
       setIsSaving(false);
     }
@@ -282,12 +336,20 @@ function AppContent() {
           <TopBar
             onOpenMenu={() => setMobileOpen(true)}
             noteCount={entries.length}
+            mode={filter === "today" ? "encouragement" : "search"}
+            message={writingPrompt}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             onClearSearch={handleClearSearch}
             userName={session?.user?.name || session?.user?.email || "访客"}
             onLogout={() => signOut({ callbackUrl: "/login" })}
           />
+
+          {topMessage && (
+            <div className="glass-card rounded-[1.6rem] border border-white/60 px-5 py-4 text-sm text-foreground/75 shadow-soft">
+              {topMessage}
+            </div>
+          )}
 
           {filter === "today" && (
             <section className="glass-card rounded-[2.3rem] border border-white/60 px-8 py-8 shadow-soft">
@@ -497,6 +559,10 @@ function shiftDate(date: Date, amount: number) {
 
 function extractPreview(content: string) {
   return diaryContentToPlainText(content).slice(0, 140) || "这一天有些内容被留在了这里。";
+}
+
+function randomItem(items: string[]) {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 export function AppShell() {

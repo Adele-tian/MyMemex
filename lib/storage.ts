@@ -2,6 +2,22 @@ import { sampleNotes } from "@/lib/sample-notes";
 import { HabitCheckin, HabitKey, Note } from "@/lib/types";
 import { extractTitle, toDateOnly } from "@/lib/utils";
 
+const REQUEST_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 function normalizeNote(note: any): Note {
   return {
     id: note.id,
@@ -23,7 +39,7 @@ export async function loadNotes(): Promise<Note[]> {
 
   try {
     // 尝试从API获取用户笔记
-    const response = await fetch('/api/notes');
+    const response = await fetchWithTimeout('/api/notes');
 
     if (!response.ok) {
       // 如果用户未登录或出现错误，返回示例数据
@@ -65,7 +81,7 @@ export async function createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'upda
   }
 
   try {
-    const response = await fetch('/api/notes', {
+    const response = await fetchWithTimeout('/api/notes', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +117,7 @@ export async function updateNote(note: Note): Promise<Note | null> {
   }
 
   try {
-    const response = await fetch('/api/notes/update-delete', {
+    const response = await fetchWithTimeout('/api/notes/update-delete', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -138,7 +154,7 @@ export async function deleteNote(noteId: string): Promise<boolean> {
   }
 
   try {
-    const response = await fetch('/api/notes/update-delete', {
+    const response = await fetchWithTimeout('/api/notes/update-delete', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -166,7 +182,7 @@ export async function loadHabitCheckins(): Promise<HabitCheckin[]> {
   }
 
   try {
-    const response = await fetch("/api/habits");
+    const response = await fetchWithTimeout("/api/habits");
     if (!response.ok) {
       if (response.status === 401) {
         return [];
@@ -193,7 +209,7 @@ export async function saveHabitCheckin(checkin: HabitCheckin): Promise<HabitChec
   }
 
   try {
-    const response = await fetch("/api/habits", {
+    const response = await fetchWithTimeout("/api/habits", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
