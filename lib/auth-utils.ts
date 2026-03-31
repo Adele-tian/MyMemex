@@ -2,7 +2,7 @@
 // 客户端认证相关功能应使用 NextAuth API 路由
 
 import prisma from '@/lib/prisma';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 // 注册新用户 - 仅在服务器端使用
 export async function registerUser(email: string, password: string, name?: string) {
