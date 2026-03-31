@@ -15,6 +15,7 @@ import { TopBar } from "@/components/top-bar";
 import { DiaryEntry, HABIT_DEFINITIONS, HabitCheckin, MoodLevel, Note, ViewFilter } from "@/lib/types";
 import { createNote, deleteNote, loadHabitCheckins, loadNotes, saveHabitCheckin, updateNote } from "@/lib/storage";
 import {
+  detectQuoteGroup,
   diaryContentToPlainText,
   extractTitle,
   formatEntryDate,
@@ -25,26 +26,24 @@ import {
 } from "@/lib/utils";
 
 function AppContent() {
-  const writingEncouragements = useMemo(
-    () => [
-      "写一点点也很好，今天的感受值得被认真放下。",
-      "不用组织得很完美，先把今天真实的你写下来。",
-      "哪怕只记一句话，也是在替今天留下一盏灯。",
-      "从此刻开始写，今天就已经被你好好接住了。",
-      "把脑海里的声音放进文字里，今天会轻一点。",
+  const QUOTE_GROUPS = {
+    low: [
+      "所谓无底深渊，下去，也是前程万里。",
+      "万物皆有裂痕，那是光照进来的地方。",
+      "在最黑暗的那段日子，我也依然保留着呼吸的节奏。",
+      "今天的 Bug，是明天复盘时的勋章。",
     ],
-    [],
-  );
-  const saveCelebrations = useMemo(
-    () => [
-      "今天也认真记录下来了，真好。",
-      "这一页已经保存好，你又陪自己走了一步。",
-      "你刚刚为今天留下了痕迹，继续慢慢来就好。",
-      "今天的心情已经被好好接住了。",
-      "保存完成，愿你回头看时会感谢现在的自己。",
+    steady: [
+      "与其等待暴风雨过去，不如学会在雨中起舞。",
+      "生活不是你活过的样子，而是你记住的样子。",
+      "今天先写一点点，也是在认真生活。",
     ],
-    [],
-  );
+    positive: [
+      "我们要有最朴素的生活与最遥远的梦想。",
+      "答案在路口，不在尽头。",
+      "你刚刚写下来的，也会成为未来回望时的光。",
+    ],
+  } as const;
   const { data: session, status } = useSession();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [habitCheckins, setHabitCheckins] = useState<HabitCheckin[]>([]);
@@ -57,7 +56,6 @@ function AppContent() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [journalText, setJournalText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [writingPrompt, setWritingPrompt] = useState("");
   const [topMessage, setTopMessage] = useState<string | null>(null);
   const [isTransitioningToHome, setIsTransitioningToHome] = useState(false);
   const [saveFeedbackMessage, setSaveFeedbackMessage] = useState<string | null>(null);
@@ -95,12 +93,6 @@ function AppContent() {
 
     void fetchData();
   }, [status]);
-
-  useEffect(() => {
-    if (filter === "today") {
-      setWritingPrompt(randomItem(writingEncouragements));
-    }
-  }, [filter, selectedDateOnly, writingEncouragements]);
 
   useEffect(() => {
     setDisplayMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
@@ -232,7 +224,8 @@ function AppContent() {
       }
 
       if (savedSuccessfully) {
-        const nextMessage = randomItem(saveCelebrations);
+        const quoteGroup = detectQuoteGroup(content, selectedMood);
+        const nextMessage = randomItem(QUOTE_GROUPS[quoteGroup]);
         setSaveFeedbackMessage(nextMessage);
         setIsTransitioningToHome(true);
         window.setTimeout(() => {
@@ -394,9 +387,8 @@ function AppContent() {
                   <h1 className="font-display mt-2 text-5xl leading-none text-foreground">
                     {formatFullDate(selectedDate.toISOString())}
                   </h1>
-                  <p className="mt-4 max-w-2xl text-base leading-8 text-foreground/72">{writingPrompt}</p>
                   {saveFeedbackMessage && (
-                    <p className="mt-3 text-sm text-foreground/80">{saveFeedbackMessage}</p>
+                    <p className="mt-4 text-sm text-foreground/80">{saveFeedbackMessage}</p>
                   )}
                   {saveErrorMessage && (
                     <p className="mt-3 text-sm text-red-500">{saveErrorMessage}</p>
@@ -506,6 +498,9 @@ function AppContent() {
 
           {filter === "home" && (
             <section className="glass-card rounded-[2.4rem] border border-white/60 px-10 py-10 shadow-soft">
+              <div className="mb-10 text-center">
+                <p className="font-display text-3xl leading-relaxed text-foreground">生活不是你活过的样子，而是你记住的样子。</p>
+              </div>
               <DataVisualization entries={entries} habits={habitCheckins} />
             </section>
           )}
@@ -721,7 +716,7 @@ function extractPreview(content: string) {
   return diaryContentToPlainText(content).slice(0, 140) || "这一天有些内容被留在了这里。";
 }
 
-function randomItem(items: string[]) {
+function randomItem(items: readonly string[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 

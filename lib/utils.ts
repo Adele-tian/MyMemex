@@ -101,6 +101,62 @@ export function getMoodEmoji(level?: number) {
   }
 }
 
+export type QuoteGroup = "low" | "steady" | "positive";
+
+export const KEYWORD_GROUP_RULES: Record<QuoteGroup, string[]> = {
+  low: ["难过", "崩溃", "焦虑", "失败", "压力", "卡住", "出错", "bug", "糟糕", "沮丧"],
+  steady: ["累", "忙", "一般", "普通", "还行", "平静", "平稳", "正常", "琐碎", "重复"],
+  positive: ["开心", "顺利", "完成", "进展", "轻松", "期待", "高兴", "满足", "有收获", "有希望"],
+};
+
+export function getQuoteGroupFromMood(level?: number): QuoteGroup | null {
+  switch (level) {
+    case 1:
+    case 2:
+      return "low";
+    case 3:
+      return "steady";
+    case 4:
+    case 5:
+      return "positive";
+    default:
+      return null;
+  }
+}
+
+export function detectQuoteGroup(input: string, moodLevel?: number): QuoteGroup {
+  const normalized = input.trim().toLowerCase();
+  const moodGroup = getQuoteGroupFromMood(moodLevel);
+  const scores: Record<QuoteGroup, number> = {
+    low: 0,
+    steady: 0,
+    positive: 0,
+  };
+
+  if (moodGroup) {
+    scores[moodGroup] += 2;
+  }
+
+  for (const [group, keywords] of Object.entries(KEYWORD_GROUP_RULES) as Array<[QuoteGroup, string[]]>) {
+    for (const keyword of keywords) {
+      if (normalized.includes(keyword.toLowerCase())) {
+        scores[group] += 1;
+      }
+    }
+  }
+
+  const orderedGroups: QuoteGroup[] = ["low", "steady", "positive"];
+  let winner: QuoteGroup = moodGroup ?? "steady";
+
+  for (const group of orderedGroups) {
+    if (scores[group] > scores[winner]) {
+      winner = group;
+    }
+  }
+
+  return winner;
+}
+
 export interface DiarySections {
   events: string;
   moodNote: string;
